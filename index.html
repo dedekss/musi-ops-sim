@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MUSI HEPP – Operator Station Simulator</title>
+<meta name="description" content="Simulator operator PLTA Musi (3 unit, switchyard 150 kV, proteksi 86-x, fault simulation). Berjalan offline.">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MUSI OPS Sim">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/hmi.css">
+</head>
+<body>
+<div class="win">
+  <div class="almbar">
+    <div class="almlines">
+      <div class="almrow sunk off" id="alm0"><span class="aid"></span><span class="amsg">&nbsp;</span><span class="ast"></span></div>
+      <div class="almrow sunk off" id="alm1"><span class="aid"></span><span class="amsg">&nbsp;</span><span class="ast"></span></div>
+    </div>
+    <button class="abtn" id="bBz">BZ<br>STOP</button>
+    <button class="abtn" id="bAck">ACK</button>
+    <button class="abtn" id="bClr">Clear</button>
+  </div>
+  <div class="toolbar">
+    <button data-a="nav:main"><span class="ic">▦</span>MainScn</button>
+    <button data-a="nav:sy"><span class="ic">⚡</span>150kV SY</button>
+    <button data-a="navu:ctl"><span class="ic">⊞</span>CtrlPnl</button>
+    <button data-a="navu:s2l"><span class="ic">≡</span>SeqMoni</button>
+    <button data-a="navu:ann"><span class="ic y">◫</span>Annunc</button>
+    <button data-a="nav:alm"><span class="ic r">!</span>AlmSum</button>
+    <button data-a="nav:trend"><span class="ic">〽</span>Trend</button>
+    <button data-a="nav:fault"><span class="ic r">ϟ</span>FaultSim</button>
+    <button data-a="nav:prot"><span class="ic">⛨</span>ProtScm</button>
+    <span class="sep"></span>
+    <button data-a="sim"><span class="ic y">▶</span><span id="tbSim">Sim x5</span></button>
+  </div>
+  <div class="status">
+    <span id="sNo">00001</span><span id="sTitle">Main Screen</span><span id="sOpe">OPE/normal</span>
+    <span id="sStn">Station No.111 : OPS01</span><span id="sSim">SIM 00:00:00</span><span id="sDate"></span>
+  </div>
+  <div class="display" id="disp">
+    <svg id="svg" viewBox="0 0 990 645" preserveAspectRatio="xMidYMid meet"></svg>
+    <div id="html" class="hidden"></div>
+    <div class="zoombar" id="zbar"><button data-a="zoom:out">−</button><span id="zLvl">100%</span><button data-a="zoom:in">+</button><button data-a="zoom:fit">↔</button><button data-a="zoom:all">⟲</button></div>
+  </div>
+  <div class="tabbar" id="tabs"></div>
+</div>
+
+<div class="dlg hidden" id="dlg">
+  <div class="dtitle"><span id="dT">CONFIRM</span><button class="dx" data-a="dlg:close">×</button></div>
+  <div class="dbody"><div class="dmsg" id="dM"></div><div id="dX"></div>
+    <div class="drow" id="dR"><button class="ex" id="dOk">EXECUTE</button><button id="dCancel">CANCEL</button></div></div>
+</div>
+
+<div class="rotate" id="rotate"><div><div class="rph"></div><b>Putar perangkat ke posisi landscape</b><br>Layar operator dirancang untuk mode mendatar.<br><small>iPhone: matikan Rotation Lock di Control Center.</small></div></div>
+
+<script src="js/pwa.js"></script>
+<script src="js/plant-engine.js"></script>
+<script src="js/hmi.js"></script>
+</body>
+</html>
