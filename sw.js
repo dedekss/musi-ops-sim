@@ -1,13 +1,15 @@
 /* MUSI OPS Sim – service worker: semua file disimpan di perangkat supaya simulator berjalan offline.
    Saat file di-update, naikkan VERSION agar perangkat mengunduh versi baru. */
-const VERSION = 'musi-ops-sim-v2.3';
+const VERSION = 'musi-ops-sim-v2.6';
 const FILES = [
   './',
   './index.html',
   './manifest.webmanifest',
   './css/hmi.css',
   './js/plant-engine.js',
+  './js/station-engine.js',
   './js/hmi.js',
+  './js/hmi-ss.js',
   './js/pwa.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -37,6 +39,8 @@ self.addEventListener('fetch', (e) => {
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req).then((res) => {
+        // hanya versi yang sukses (200) yang menggantikan salinan; 404/500 → tetap pakai salinan di perangkat
+        if (!res.ok) return caches.match('./index.html').then((hit) => hit || res);
         const copy = res.clone();
         caches.open(VERSION).then((c) => c.put('./index.html', copy));
         return res;

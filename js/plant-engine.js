@@ -26,6 +26,8 @@
   const GV_MW = [[0, -1.2], [5, -0.6], [11.5, 0], [20, 6], [30, 13], [40, 20], [50, 30], [60, 40], [70, 52], [80, 63], [90, 74], [100, 82]];
   const GV_NL = 11.5;      // bukaan no-load (74mb)
 
+  // modul tambahan (station service, bendungan, dll.) mendaftar di sini: { build, points, tick, inject, clear, init }
+  const EXT = [];
   const lag = (x, t, tau, dt) => x + (t - x) * Math.min(1, dt / tau);
   const rate = (x, t, r, dt) => { const d = t - x, m = r * dt; return Math.abs(d) <= m ? t : x + Math.sign(d) * m; };
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -147,7 +149,7 @@
       prot: '86-2', src: 'data JEZ2K031 SH.001/002', act: 'Reset 86-2 setelah standstill.' },
     { key: 'intake_low', grp: 'OPERASI – WADUK', name: 'Muka air intake turun < El. 577.51 m', unit: false,
       cause: 'Debit turbin > inflow (drawdown dipercepat untuk latihan).',
-      chain: 'RTU-I: intake WL < 577.51 m selama 5 s → 86-5 SEMUA unit (juga unit yang diam: start diblok) → unload & stop.', prot: '86-5 (semua unit)', src: 'data JEZ2K031 SH.003', act: 'Kurangi total beban sebelum batas, koordinasi jadwal.' },
+      chain: 'Debit turbin > inflow → level turun (dipercepat) → RTU-I: intake WL < El. 577.51 m selama 5 s → 86-5 SEMUA unit (unit yang diam: start diblok) → unload ± 70 s → 52 open → stop. Level ditahan di ± 577.40 m selama gangguan aktif. Setelah CLEAR, pengisian dipercepat sampai El. 577.80 m, lalu 86-5 dapat direset saat unit stand still.', prot: '86-5 (semua unit)', src: 'data JEZ1L675 SH.13 / JEZ2K031 SH.003', act: 'Kurangi total beban sebelum batas, koordinasi jadwal. Setelah level pulih: reset 86-5 tiap unit, start ulang.' },
     // ---------------- switchyard ----------------
     { key: 'tl1_trip', grp: 'SWITCHYARD', name: 'Gangguan T/L No.1 (reclose sukses)', unit: false,
       cause: 'Gangguan temporer satu fasa di saluran ke GI New Curup.',
@@ -237,6 +239,7 @@
       c.sw.gov = 'POWER'; c.sw.alrSP = P; c.pos = c.target = 5; c.dir = 0; c.lastDir = 1; c.tr = null;
       c.dur = { start: { 1: 14, 2: 177, 3: 13, 4: 56, 5: 18 }, stop: {} };   // waktu aktual dari layar OPS (13-Okt-2017)
       const Ts = this.steadyTemps(); Object.assign(p.T, Ts); p.T.st = Ts.st.slice();
+      p.mon.cwArm = true; p.mon.cwT = 999;     // pompa CW sudah lama berjalan → proteksi aliran sudah ter-arm
       Object.assign(p.vib, this.steadyVib());
     }
 
@@ -567,7 +570,7 @@
       if (!this.lo[k]) return;
       if ((k === '86-5' || k === '86-1' || k === '86-2' || k === '86-T' || k === '86-PC') && !this.s14LT()) { this.log('INFO', `${k} RESET ditolak: unit belum stand still (14LT)`); return; }
       if (k === '86-4' && this.p.cb) { this.log('INFO', '86-4 RESET ditolak: 52 masih tertutup'); return; }
-      if (this.protActive(k)) { this.log('INFO', `${k} RESET ditolak: penyebab masih ada (${this.lo[k]})`); return; }
+      if (this.protActive(k)) { const wl = /INTAKE/.test(this.lo[k]) ? ` – level sekarang El. ${this.plant.intakeWL.toFixed(2)} m, perlu > 577.51 m` : ''; this.log('INFO', `${k} RESET ditolak: penyebab masih ada (${this.lo[k]})${wl}`); return; }
       this.log('CMD', `${k} RESET`); this.lo[k] = null;
       if (k === '86-1' || k === '86-2') this.p.mon.pendulum = false;
     }
@@ -635,7 +638,7 @@
 
     physics(dt) {
       const p = this.p, sw = this.sw, F = this.fx;
-      const aux = p.ax;
+      const aux = p.ax && this.plant.auxOK(this.n);     // pompa bantu butuh catu 400 V (MCC unit) dari station service
       // ---------------- auxiliary ----------------
       p.cw[0].fail = !!(F.cw_both_fail || (F.cw_main_trip && p.cwMain === 0));
       p.cw[1].fail = !!(F.cw_both_fail || (F.cw_main_trip && p.cwMain === 1));
@@ -645,7 +648,7 @@
       this.pairStep(p.cw, 'cwMain', aux, dt, 2.0, 'MAIN COOLING WATER PUMP');
       this.pairStep(p.ssb, 'ssbMain', aux, dt, 1.5, 'SHAFT SEAL BOOSTER PUMP');
       this.pumpStep(p.qt, p.qtCmd, dt, 1.5);
-      if (aux) { p.axT += dt; if (p.axT > 0.8) p.sh = false; } else { p.axT = 0; p.sh = p.speed < 0.05 ? true : p.sh; }
+      if (p.ax) { p.axT += dt; if (p.axT > 0.8) p.sh = false; } else { p.axT = 0; p.sh = p.speed < 0.05 ? true : p.sh; }
       if (p.vq) { p.vqT += dt; if (p.brakeCmd === 'release' && p.vqT > 60) { p.vq = false; this.log('INFO', 'DO0154 VACUUM CLEANER STOP'); } }
 
       const cw = (p.cw[0].run || p.cw[1].run) ? 1 : 0;
@@ -663,7 +666,7 @@
       const govPump = p.qp[0].run || p.qp[1].run;
       const leak = 0.0015 + (F.gov_oil_leak ? 0.012 : 0) + Math.abs(p._gvMove || 0) * 0.02;
       p.govP = clamp(p.govP + ((govPump ? Math.min(0.008, 0.5 * (1.02 - p.govP)) : 0) - leak) * dt, 0.2, 1.02);
-      if (!aux && !govPump) p.govP = Math.max(p.govP, 0.95);    // stand still: tangki dipertahankan
+      if (!p.ax && !govPump) p.govP = Math.max(p.govP, 0.95);   // stand still: tangki dipertahankan
       p.govLvl = lag(p.govLvl, F.gov_oil_leak ? 0.6 : 1, 400, dt);
 
       // ---------------- rem, bypass, seal, inlet valve ----------------
@@ -787,7 +790,8 @@
       if (F.gov_sump_temp) F.gov_sump_temp.v = Math.min(30, F.gov_sump_temp.v + dt * 0.08);    // 1ST 60 °C ≈ 3 menit, 2ND 65 °C ≈ 4 menit
       if (F.tgb_oil_low) F.tgb_oil_low.v = Math.min(0.7, F.tgb_oil_low.v + dt * 0.002);       // 1ST (<80 %) ≈ 100 s, 2ND (<60 %) ≈ 200 s
       const Ts = this.steadyTemps(), T = p.T;
-      for (const k of Object.keys(Ts)) if (k !== 'st') T[k] = lag(T[k], Ts[k], k === 'thrust' && F.thrust_temp ? 8 : 60, dt);
+      // konstanta waktu termal: metal & oli bearing ± 8 menit (kenaikan 3–5 °C/menit saat pendingin hilang), lainnya 1 menit
+      for (const k of Object.keys(Ts)) if (k !== 'st') T[k] = lag(T[k], Ts[k], k === 'thrust' && F.thrust_temp ? 8 : /^(thrust|ugb|lgb|tgb)(Oil)?$/.test(k) ? 480 : 60, dt);
       Ts.st.forEach((v, i) => T.st[i] = lag(T.st[i], v, 120, dt));
       const Vs = this.steadyVib();
       for (const k of Object.keys(Vs)) p.vib[k] = lag(p.vib[k], Vs[k] * (1 + noise(0.03)), 2, dt);
@@ -1004,10 +1008,12 @@
     build() {
       this.units = [1, 2, 3].map(n => new Unit(n, this));
       this.sy = new Switchyard(this);
-      this.intakeWL = 578.60; this.inflow = 14.6; this.cwIn = 27.3;
-      this.fx = {};
+      this.intakeWL = 578.60; this.inflow = 14.6; this.cwIn = 27.3; this.refill = false;
+      this.fx = {}; this.spillQ = 0;
+      EXT.forEach(e => e.build && e.build(this));
       this.alarms = new AlarmSystem(this);
     }
+    auxOK(n) { return this.ss ? this.ss.unitAux(n) : true; }
     headFactor() { return clamp((this.intakeWL - 173.5) / (578.6 - 173.5), 0.9, 1.02); }
     log(type, msg) {
       this.events.push({ id: ++this.seq, t: this.t, type, msg });
@@ -1023,12 +1029,14 @@
       this.initAllStop();
       const LD = [[70.0, 10.0], [70.0, 10.0], [70.0, 10.0]];   // beban penuh (rating 70 MW) untuk seluruh unit
       this.units.forEach((u, i) => u.forceLoad(LD[i][0], LD[i][1]));
+      EXT.forEach(e => e.init && e.init(this, 'op'));
       this.alarms.reset(true);
       this.log('CMD', 'INIT: kondisi operasi beban penuh (U1 / U2 / U3 = 70 MW)');
     }
     /* ---- injeksi gangguan ---- */
     inject(key, unitN) {
       const s = SCN[key]; if (!s) return;
+      for (const e of EXT) if (e.inject && e.inject(this, key, unitN)) return;
       if (s.unit) {
         const u = this.units[(unitN || 1) - 1];
         if (u.fx[key]) { delete u.fx[key]; this.log('INFO', `FAULT CLEAR U${u.n}: ${s.name}`); return; }
@@ -1050,7 +1058,7 @@
         if (key === 'gov_runaway') { if (u.p.cb) u.openCB('Load rejection (skenario)'); }
         if (key === 'gen_40') u.p.field = Math.min(u.p.field, 0.6);
       } else {
-        if (this.fx[key]) { delete this.fx[key]; this.log('INFO', `FAULT CLEAR: ${s.name}`); if (key === 'busa_fault') this.sy.busFault.A = false; if (key === 'tl_both') { this.sy.lineOK.L1 = this.sy.lineOK.L2 = true; } if (key === 'tl1_perm') this.sy.lineOK.L1 = true; return; }
+        if (this.fx[key]) { delete this.fx[key]; this.log('INFO', `FAULT CLEAR: ${s.name}`); if (key === 'intake_low' && this.intakeWL < 577.80) { this.refill = true; this.log('INFO', 'Pengisian waduk intake dipercepat (latihan) sampai El. 577.80 m'); } if (key === 'busa_fault') this.sy.busFault.A = false; if (key === 'tl_both') { this.sy.lineOK.L1 = this.sy.lineOK.L2 = true; } if (key === 'tl1_perm') this.sy.lineOK.L1 = true; return; }
         this.fx[key] = { t0: this.t };
         this.log('ALARM', `FAULT INJECT: ${s.name}`);
         const sy = this.sy;
@@ -1069,7 +1077,7 @@
       }
     }
     activeFault(key, n) { return SCN[key].unit ? !!this.units[n - 1].fx[key] : !!this.fx[key]; }
-    clearAllFaults() { this.units.forEach(u => u.fx = {}); this.fx = {}; this.sy.busFault = { A: false, B: false }; this.sy.lineOK = { L1: true, L2: true }; this.log('INFO', 'Semua gangguan dihapus'); }
+    clearAllFaults() { if (this.fx.intake_low && this.intakeWL < 577.80) this.refill = true; this.units.forEach(u => u.fx = {}); this.fx = {}; this.sy.busFault = { A: false, B: false }; this.sy.lineOK = { L1: true, L2: true }; EXT.forEach(e => e.clear && e.clear(this)); this.log('INFO', 'Semua gangguan dihapus'); }
 
     tick(dt) {
       dt = clamp(+dt || 0, 0, 60);
@@ -1081,12 +1089,16 @@
         this.units.forEach(u => u.tick(st));
         // muka air intake
         const qT = this.units.reduce((a, u) => a + u.meas().flow, 0);
-        let net = this.inflow - qT;
-        if (this.fx.intake_low) net -= 900;   // drawdown dipercepat (latihan)
+        let net = this.inflow - qT - (this.spillQ || 0);
+        // skenario latihan: drawdown dipercepat sampai sedikit di bawah batas 86-5, lalu level ditahan;
+        // setelah CLEAR, pengisian dipercepat sampai El. 577.80 m supaya 86-5 bisa direset
+        if (this.fx.intake_low) net = this.intakeWL > 577.40 ? net - 900 : Math.min(net, 0);
+        else if (this.refill) { if (this.intakeWL < 577.80) net += 900; else { this.refill = false; this.log('INFO', `Muka air intake kembali El. ${this.intakeWL.toFixed(2)} m – 86-5 dapat direset`); } }
         const V = volIntake(this.intakeWL) + net * st;
         // invers kurva volume (newton 2 iterasi)
         let x = this.intakeWL; for (let k = 0; k < 2; k++) { const fx = volIntake(x) - V, d = (2 * 189.475 * x - 218232.925) * 1000; x -= fx / d; }
-        this.intakeWL = clamp(x, 574.0, 579.4);
+        this.intakeWL = clamp(x, 574.0, 581.0);
+        for (const e of EXT) if (e.tick) e.tick(this, st);
         this.alarms.tick(st);
       }
     }
@@ -1184,6 +1196,7 @@
       this.defs = [];
       plant.units.forEach(u => UNIT_POINTS.forEach(d => this.defs.push({ grp: 'U' + u.n, win: d[0], tag: `${u.n}${d[1]}`, text: d[2], lvl: d[3], cond: () => d[4](u), delay: d[5] || 0 })));
       SY_POINTS.forEach(d => this.defs.push({ grp: 'SY', win: d[0], tag: d[1], text: d[2], lvl: d[3], cond: () => d[4](plant), delay: d[5] || 0 }));
+      EXT.forEach(e => e.points && e.points(plant).forEach(d => this.defs.push(Object.assign({ delay: 0 }, d))));
       this.defs.forEach((d, i) => { d.i = i; this.pt[i] = { on: false, tOn: 0, ack: true, id: null }; });
     }
     tick(dt) {
@@ -1253,6 +1266,6 @@
   ];
   const RESET_RULE = { '86-1': 'RESET PB 3-86-1 (OPS) – penyebab hilang & stand still (14LT)', '86-2': 'RESET PB 3-86-2 (OPS) – penyebab hilang & stand still (14LT)', '86-T': 'stand still & penyebab hilang', '86-PC': 'stand still & penyebab hilang', '86-4': 'RESET PB 3-86-4 (OPS/ULCB) – 52 OPEN & penyebab hilang', '86-5': '86-5 RESET face plate OPS – 14L ON & penyebab hilang' };
 
-  const API = { PROT_TABLE, RESET_RULE, Plant, Unit, Switchyard, STEP, START_T, STOP_T, SCENARIOS, SCN, UNIT_WIN, SY_WIN, PR, RPM, GV_MW, GV_NL, interp };
+  const API = { EXT, clamp, lag, rate, PROT_TABLE, RESET_RULE, Plant, Unit, Switchyard, STEP, START_T, STOP_T, SCENARIOS, SCN, UNIT_WIN, SY_WIN, PR, RPM, GV_MW, GV_NL, interp };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.MUSI = API;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -33,6 +33,8 @@
   const backBtn = () => `<g data-a="nav:back">${R(955, 8, 26, 26, '', 'fill="#c8c8c8"')}<path d="M961,28 L961,16 L975,16 M969,11 L975,16 L969,21" stroke="#202020" stroke-width="2" fill="none"/></g>`;
 
   /* =========================== SCREEN REGISTRY =========================== */
+  // layar & aksi tambahan didaftarkan oleh js/hmi-ss.js lewat window.HMIX
+  const EXTS = {}, EXTU = {}, EXTA = {}, NA_MSG = {};
   const SCR = {
     main: { no: '00001', title: () => 'Main Screen', grp: 'main' },
     sy: { no: '00002', title: () => '150kV SWITCHYARD', grp: 'ctl' },
@@ -41,6 +43,10 @@
     prot: { no: '00098', title: () => 'PROTECTION SCHEME (86 LOCKOUT)', grp: 'ins', html: true },
     fault: { no: '00099', title: () => 'FAULT SIMULATION (INSTRUCTOR)', grp: 'ins', html: true },
     annsy: { no: '00076', title: () => 'SWITCHYARD ANN', grp: 'ann' },
+    annuss: { no: '00074', title: () => 'UNDERGROUND S/S ANN', grp: 'ann' },
+    annmss: { no: '00075', title: () => 'MAIN CONTROL S/S ANN', grp: 'ann' },
+    annmp1: { no: '00077', title: () => 'MIMIC PANEL (1/2) ANN', grp: 'ann' },
+    annmp2: { no: '00078', title: () => 'MIMIC PANEL (2/2) ANN', grp: 'ann' },
   };
   const UNIT_SCR = {
     ctl: (n) => ['0002' + (3 + n), `UNIT NO.${n} CONTROL PANEL`, 'ctl'],
@@ -56,8 +62,10 @@
   };
   function scrInfo(id) {
     if (SCR[id]) return { id, ...SCR[id], title: SCR[id].title() };
+    if (EXTS[id]) return { id, ...EXTS[id], title: EXTS[id].title() };
     const m = id.match(/^([a-z0-9]+?)(\d)$/);
     if (m && UNIT_SCR[m[1]]) { const [no, t, grp] = UNIT_SCR[m[1]](+m[2]); return { id, no, title: t, grp, base: m[1], n: +m[2] }; }
+    if (m && EXTU[m[1]]) { const e = EXTU[m[1]]; return { id, no: e.no(+m[2]), title: e.title(+m[2]), grp: e.grp, html: e.html, base: m[1], n: +m[2], ext: true }; }
     return { id: 'main', ...SCR.main, title: 'Main Screen' };
   }
   const TABS = {
@@ -65,7 +73,7 @@
     seq: (n) => [[`sc1${n}`, `U${n} START COND.1`], [`sc2${n}`, `U${n} START COND.2`], [`s2l${n}`, `U${n} STOP TO LOAD`], [`l2s${n}`, `U${n} LOAD TO STOP`], ['trend', 'Historical']],
     sys: (n) => [[`ovw${n}`, `NO.${n} WATER FLOW`], [`cap${n}`, 'CAPABILITY CURVE'], [`vib${n}`, 'VIBRATION'], [`ai${n}`, 'ANALOG INPUT'], ['trend', 'Historical']],
     ctl: () => [['sy', '150kV SY'], ['ctl1', 'NO.1 CONTROL PNL'], ['ctl2', 'NO.2 CONTROL PNL'], ['ctl3', 'NO.3 CONTROL PNL'], ['trend', 'Historical']],
-    ann: () => [['ann1', 'UNIT1 ANN'], ['ann2', 'UNIT2 ANN'], ['ann3', 'UNIT3 ANN'], ['annsy', 'SWITCHYARD ANN'], ['alm', 'AlmSum']],
+    ann: () => [['ann1', 'UNIT1 ANN'], ['ann2', 'UNIT2 ANN'], ['ann3', 'UNIT3 ANN'], ['annuss', 'USS ANN'], ['annmss', 'MSS ANN'], ['annsy', 'SWITCHYARD ANN'], ['annmp1', 'MIMIC 1/2'], ['annmp2', 'MIMIC 2/2'], ['alm', 'AlmSum']],
     ins: () => [['fault', 'FAULT SIM.'], ['prot', 'PROTECTION'], ['alm', 'ALARM SUM.'], ['trend', 'TREND']],
   };
   function go(id, push = true) {
@@ -98,25 +106,25 @@
       let s = R(10, y, 255, h, '', 'fill="#202020" stroke="#bbb"') + R(275, y, 705, h, '', 'fill="#202020" stroke="#bbb"');
       s += extra || T(137, y + h / 2 + 6, lab, 'tc', 'style="fill:#ff40ff;font-size:15px"');
       rows.forEach((r, ri) => r.forEach((b, ci) => { if (!b) return; const [lb, act] = b; const x = 284 + ci * 173, yy = y + 6 + ri * 24;
-        s += `<g class="menu ${act ? '' : 'na'}" data-a="${act || 'na'}">${R(x, yy, 163, 18, '', `fill="${col}"`)}${T(x + 81, yy + 13, lb)}</g>`; }));
+        s += `<g class="menu ${act ? '' : 'na'}" data-a="${act || 'na:' + lb}">${R(x, yy, 163, 18, '', `fill="${col}"`)}${T(x + 81, yy + 13, lb)}</g>`; }));
       return s;
     };
-    g += sec(76, 52, 'Annunciator', [[['Unit No.1', 'nav:ann1'], ['Unit No.2', 'nav:ann2'], ['Unit No.3', 'nav:ann3'], ['Mimic Panel (1/2)']], [['Station Service (USS)'], ['Station Service (MSS)'], ['Switchyard', 'nav:annsy'], ['Mimic Panel (2/2)']]], '#ffff40');
-    g += sec(138, 34, 'Station View', [[['Station Service Overview'], ['150kV Switchyard', 'nav:sy'], ['Main Control House'], ['Underground Powerhouse']]], '#40ffff');
+    g += sec(76, 52, 'Annunciator', [[['Unit No.1', 'nav:ann1'], ['Unit No.2', 'nav:ann2'], ['Unit No.3', 'nav:ann3'], ['Mimic Panel (1/2)', 'nav:annmp1']], [['Station Service (USS)', 'nav:annuss'], ['Station Service (MSS)', 'nav:annmss'], ['Switchyard', 'nav:annsy'], ['Mimic Panel (2/2)', 'nav:annmp2']]], '#ffff40');
+    g += sec(138, 34, 'Station View', [[['Station Service Overview', 'nav:sso'], ['150kV Switchyard', 'nav:sy'], ['Main Control House', 'nav:mch'], ['Underground Powerhouse', 'nav:uph']]], '#40ffff');
     const tot = P.units.reduce((a, u) => ({ p: a.p + (u.p.cb ? u.p.p : 0), q: a.q + (u.p.cb ? u.p.q : 0) }), { p: 0, q: 0 });
-    g += sec(182, 76, '', [[['SY/SS Control Panel', 'nav:sy'], ['Air Supply System'], ['Intake & Reregulating Dam'], ['Rain Fall Monitor']], [['Schedule(Rainy/Weekday)'], ['Schedule(Rainy/Weekend)'], ['Schedule(Arbitrary Setup)'], ['Daily Power Operation']], [['Schedule(Dry/Weekday)'], ['Schedule(Dry/Weekend)'], ['Water Level Control']]], '#40ff40',
+    g += sec(182, 76, '', [[['SY/SS Control Panel', 'nav:ssc'], ['Air Supply System'], ['Intake & Reregulating Dam', 'nav:dam'], ['Rain Fall Monitor']], [['Schedule(Rainy/Weekday)'], ['Schedule(Rainy/Weekend)'], ['Schedule(Arbitrary Setup)'], ['Daily Power Operation', 'nav:dpo']], [['Schedule(Dry/Weekday)'], ['Schedule(Dry/Weekend)'], ['Water Level Control', 'nav:wlc']]], '#40ff40',
       T(55, 225, 'Common', 'tc', 'style="fill:#ff40ff;font-size:15px"') + L(100, 182, 100, 258, 'ln') + T(150, 208, f(tot.p, 1) + '  MW', 't', 'style="fill:#ff40ff"') + T(150, 228, f(tot.q, 1) + '  MVar', 't', 'style="fill:#ff40ff"') + T(150, 248, 'WL ' + f(P.intakeWL, 2), 't', 'style="fill:#ff40ff"'));
     [1, 2, 3].forEach((n, i) => {
       const u = U(n), m = u.meas(), y = 268 + i * 84;
-      g += sec(y, 76, '', [[['Control Panel', `nav:ctl${n}`], ['Capability Curve', `nav:cap${n}`]], [['Water Flow System', `nav:ovw${n}`], ['Turbine Actuator'], ['Inlet Valve Hydraulic'], ['Vibration Monitor', `nav:vib${n}`]],
+      g += sec(y, 76, '', [[['Control Panel', `nav:ctl${n}`], ['Capability Curve', `nav:cap${n}`]], [['Water Flow System', `nav:ovw${n}`], ['Turbine Actuator', `nav:tact${n}`], ['Inlet Valve Hydraulic', `nav:ivh${n}`], ['Vibration Monitor', `nav:vib${n}`]],
         [['Start Condition(1/2)', `nav:sc1${n}`], ['Start Condition(2/2)', `nav:sc2${n}`], ['Stop To Load', `nav:s2l${n}`], ['Load To Stop', `nav:l2s${n}`]]], '#40ff40',
         T(50, y + 44, `Unit No.${n}`, 'tc', 'style="fill:#ff40ff;font-size:15px"') + L(98, y, 98, y + 76, 'ln') +
         T(108, y + 22, `${f(m.p)} MW`, 't', 'style="fill:#ff40ff"') + T(190, y + 22, `${f(m.I, 0)} A`, 't', 'style="fill:#ff40ff"') +
         T(108, y + 44, `${f(m.q)} MVar`, 't', 'style="fill:#ff40ff"') + T(190, y + 44, `${f(m.kv)} kV`, 't', 'style="fill:#ff40ff"') +
         T(108, y + 66, `${f(m.rpm)} RPM`, 't', 'style="fill:#ff40ff"') + T(190, y + 66, M.STEP[u.pos], 't', 'style="fill:#ffff80;font-size:9px"'));
     });
-    g += sec(522, 52, 'Analog Input', [[['Unit No.1', 'nav:ai1'], ['Unit No.2', 'nav:ai2'], ['Unit No.3', 'nav:ai3']], [['Station Service (USS)'], ['Station Service (MSS)'], ['Switchyard', 'nav:sy'], ['Intake & Reregulating Dam']]], '#ffa040');
-    g += T(495, 600, 'Tombol redup = layar yang belum dimodelkan di simulator ini.', 'tc dim', 'style="font-size:10px"');
+    g += sec(522, 52, 'Analog Input', [[['Unit No.1', 'nav:ai1'], ['Unit No.2', 'nav:ai2'], ['Unit No.3', 'nav:ai3']], [['Station Service (USS)', 'nav:aiuss'], ['Station Service (MSS)', 'nav:aimss'], ['Switchyard', 'nav:sy'], ['Intake & Reregulating Dam', 'nav:aidam']]], '#ffa040');
+    g += T(495, 600, 'Tombol redup = layar yang belum dimodelkan (data belum tersedia) – ketuk untuk melihat data yang dibutuhkan.', 'tc dim', 'style="font-size:10px"');
     g += T(495, 616, 'Instruktur: FAULT SIM. (kanan atas) untuk inisialisasi kondisi & injeksi gangguan.', 'tc dim', 'style="font-size:10px"');
     return g;
   }
@@ -436,18 +444,24 @@
   }
 
   /* =========================== ANNUNCIATOR =========================== */
-  const GRPS = [['UNIT1', 'U1', 'ann1'], ['UNIT2', 'U2', 'ann2'], ['UNIT3', 'U3', 'ann3'], ['UNDERGROUND\nSTATION SERVICE', null, null], ['MAIN CONTROL\nSTATION SERVICE', null, null], ['SWITCHYARD', 'SY', 'annsy'], ['MIMIC PANEL\n(1/2)', null, null], ['MIMIC PANEL\n(2/2)', null, null]];
+  const GRPS = [['UNIT1', 'U1', 'ann1'], ['UNIT2', 'U2', 'ann2'], ['UNIT3', 'U3', 'ann3'], ['UNDERGROUND\nSTATION SERVICE', 'USS', 'annuss'], ['MAIN CONTROL\nSTATION SERVICE', 'MSS', 'annmss'], ['SWITCHYARD', 'SY', 'annsy'], ['MIMIC PANEL\n(1/2)', 'MP1', 'annmp1'], ['MIMIC PANEL\n(2/2)', 'MP2', 'annmp2']];
+  // mimic board (JEZ1L699 SH.063–079): ringkasan jendela grup lain – [grup sumber, baris sumber, awalan label]
+  const MP_MAP = { MP1: { A: ['U1', 'A', 'U1 '], B: ['U1', 'B', 'U1 '], C: ['U2', 'A', 'U2 '], D: ['U2', 'B', 'U2 '], E: ['U3', 'A', 'U3 '], F: ['U3', 'B', 'U3 '] },
+    MP2: { A: ['USS', 'B', 'PH '], B: ['USS', 'C', 'PH '], C: ['MSS', 'B', 'MCH '], D: ['MSS', 'C', 'MCH '], E: ['SY', 'A', ''], F: ['SY', 'B', ''] } };
+  const grpAct = (g) => MP_MAP[g] ? Object.values(MP_MAP[g]).some(([sg]) => P.alarms.grpActive(sg)) : P.alarms.grpActive(g);
+  const winOf = (grp, r) => { if (MP_MAP[grp]) { const [sg, sr, pre] = MP_MAP[grp][r]; const W = M.ANN_WIN && M.ANN_WIN[sg] || (sg === 'SY' ? M.SY_WIN : M.UNIT_WIN); return W[sr].map((l, i) => ({ lab: l ? pre + l : '', g: sg, w: sr + (i + 1) })); }
+    const W = M.ANN_WIN && M.ANN_WIN[grp] || (grp === 'SY' ? M.SY_WIN : M.UNIT_WIN); return W[r].map((l, i) => ({ lab: l, g: grp, w: r + (i + 1) })); };
   function scrAnn(grp, label) {
     let g = title(`${label} ANN`) + backBtn();
     const xs = [47, 164, 281, 398, 515, 632, 749, 866];
-    GRPS.forEach(([lab, gk, sid], i) => { const act = gk ? P.alarms.grpActive(gk) : false; g += `<g class="grp ${act ? 'act' : ''} ${gk === grp ? 'cur' : ''}" ${sid ? `data-a="nav:${sid}"` : ''}>${R(xs[i], 50, 104, 46)}${mline(xs[i] + 52, 77, lab, '', 11)}</g>`; });
-    const W = grp === 'SY' ? M.SY_WIN : M.UNIT_WIN;
+    GRPS.forEach(([lab, gk, sid], i) => { const act = gk ? grpAct(gk) : false; g += `<g class="grp ${act ? 'act' : ''} ${gk === grp ? 'cur' : ''}" ${sid ? `data-a="nav:${sid}"` : ''}>${R(xs[i], 50, 104, 46)}${mline(xs[i] + 52, 77, lab, '', 11)}</g>`; });
     xs.forEach((x, i) => { g += T(x + 52, 118, i + 1, 't tc'); });
     'ABCDEF'.split('').forEach((r, ri) => {
       const y = 130 + ri * 56.3; g += T(23, y + 27, r, 't tc');
-      W[r].forEach((lab, ci) => { const st = P.alarms.win(grp, r + (ci + 1)); g += `<g class="ann ${st === 'off' ? '' : st}" data-a="win:${grp}:${r}${ci + 1}">${R(xs[ci], y, 104, 46)}${mline(xs[ci] + 52, y + 27, lab, '', 11)}</g>`; });
+      winOf(grp, r).forEach(({ lab, g: sg, w }, ci) => { const st = lab ? P.alarms.win(sg, w) : 'off'; g += `<g class="ann ${st === 'off' ? '' : st}" data-a="win:${sg}:${w}">${R(xs[ci], y, 104, 46)}${mline(xs[ci] + 52, y + 27, lab, '', lab.split('\n').length > 3 ? 9.5 : 11)}</g>`; });
     });
-    g += b3(736, 588, 102, 27, 'RESET', '', `annrst:${grp}`) + b3(853, 588, 102, 27, 'ACK', '', `annack:${grp}`);
+    const ag = MP_MAP[grp] ? '' : grp;
+    g += b3(736, 588, 102, 27, 'RESET', '', `annrst:${ag}`) + b3(853, 588, 102, 27, 'ACK', '', `annack:${ag}`);
     return g;
   }
 
@@ -563,9 +577,12 @@
   }
   const TS = [['speed', 'SPEED %', '#ffff00', 1], ['pp', 'P % (70MW)', '#ff4040', 1], ['q', 'Q MVar', '#3a7bff', 1], ['gv', 'GV %', '#00ff60', 1], ['vt', 'GEN.V %', '#ff40ff', 1], ['thr', 'THRUST ℃', '#ffa040', 0], ['gp', 'GOV OIL P %', '#4ce0ff', 0]];
   const hist2 = [];
+  // trend plant: [kunci, label, warna, tampil, fungsi skala ke sumbu kiri (−40…150)]
+  const TSP = [['wl', 'INTAKE WL (m, sumbu kanan)', '#4ce0ff', 1, (v) => (v - 576) * 40], ['rwl', 'RE-REG DAM WL (m −423)', '#ff40ff', 0, (v) => (v - 576 + 423) * 40],
+    ['qin', 'INFLOW m³/s', '#ffff00', 1, (v) => v / 2], ['qt', 'Q TURBIN m³/s', '#00ff60', 1, (v) => v / 2], ['qsp', 'Q SPILLWAY m³/s', '#ff4040', 1, (v) => v / 2]];
   function scrTrend() {
-    if (!$('trend')) return `<div class="tw">${[1, 2, 3].map((n) => `<span class="sbx" data-a="tru:${n}" style="padding:2px 8px;border:1px solid #666;${trendU === n ? 'background:#ffff80;color:#000' : ''}">UNIT ${n}</span>`).join('')}
-      ${TS.map((s, i) => `<span data-a="trs:${i}" class="${s[3] ? '' : 'off'}"><i style="background:${s[2]}"></i>${s[1]}</span>`).join('')}</div><canvas id="trend"></canvas>`;
+    if (!$('trend')) return `<div class="tw"><span class="sbx" data-a="tru:0" style="padding:2px 8px;border:1px solid #666;${trendU === 0 ? 'background:#ffff80;color:#000' : ''}">PLANT / DAM</span>${[1, 2, 3].map((n) => `<span class="sbx" data-a="tru:${n}" style="padding:2px 8px;border:1px solid #666;${trendU === n ? 'background:#ffff80;color:#000' : ''}">UNIT ${n}</span>`).join('')}
+      ${(trendU === 0 ? TSP : TS).map((s, i) => `<span data-a="trs:${i}" class="${s[3] ? '' : 'off'}"><i style="background:${s[2]}"></i>${s[1]}</span>`).join('')}</div><canvas id="trend"></canvas>`;
     return null;
   }
   function drawTrend() {
@@ -578,8 +595,13 @@
     g.font = '10px monospace'; g.strokeStyle = '#2a2a2a'; g.fillStyle = '#999';
     for (let v = -40; v <= 150; v += 20) { g.beginPath(); g.moveTo(Lm, Y(v)); g.lineTo(Lm + pw, Y(v)); g.stroke(); g.fillText(v, 4, Y(v) + 3); }
     for (let t = Math.ceil(t0 / 60) * 60; t <= tEnd; t += 60) { const x = Lm + (t - t0) / win * pw; g.beginPath(); g.moveTo(x, 8); g.lineTo(x, 8 + ph); g.stroke(); g.fillText(fmtT(t).slice(3), x - 14, H - 6); }
-    TS.forEach(([k, , col, on]) => { if (!on) return; g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); let st = false;
-      for (const h of hist2) { if (h.t < t0) continue; const v = h.u[trendU - 1][k]; const x = Lm + (h.t - t0) / win * pw; st ? g.lineTo(x, Y(v)) : (g.moveTo(x, Y(v)), st = true); } g.stroke(); });
+    if (trendU === 0) {
+      g.fillStyle = '#4ce0ff'; for (let wl = 576; wl <= 579.5; wl += 0.5) g.fillText(wl.toFixed(1), Lm + pw - 34, Y((wl - 576) * 40) - 2);
+      [[577.51, '#ff4040', 'LWL 86-5 577.51'], [579.1, '#ffa040', 'FSL 579.10']].forEach(([wl, c, lb]) => { g.strokeStyle = c; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(Lm, Y((wl - 576) * 40)); g.lineTo(Lm + pw, Y((wl - 576) * 40)); g.stroke(); g.setLineDash([]); g.fillStyle = c; g.fillText(lb, Lm + 4, Y((wl - 576) * 40) - 3); });
+      g.fillStyle = '#999'; g.fillText('m³/s = nilai × 2', 4, H - 18);
+    }
+    (trendU === 0 ? TSP : TS).forEach(([k, , col, on, fx]) => { if (!on) return; g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); let st = false;
+      for (const h of hist2) { if (h.t < t0) continue; const v = trendU === 0 ? fx(h.pl[k]) : h.u[trendU - 1][k]; const x = Lm + (h.t - t0) / win * pw; st ? g.lineTo(x, Y(v)) : (g.moveTo(x, Y(v)), st = true); } g.stroke(); });
   }
 
   /* =========================== RENDER =========================== */
@@ -589,7 +611,8 @@
     if (info.html) {
       const el = $('html');
       if (scr === 'trend') { const h = scrTrend(); if (h) { el.innerHTML = h; } drawTrend(); return; }
-      const h = scr === 'fault' ? scrFault() : scr === 'prot' ? scrProt() : scrAlm();
+      const ex = EXTS[scr] || (info.ext && EXTU[info.base]);
+      const h = scr === 'fault' ? scrFault() : scr === 'prot' ? scrProt() : ex ? ex.draw(info.n) : scrAlm();
       if (h !== lastHTML) { const st = el.scrollTop; const evs = el.querySelectorAll('.ev,.al'); const sc = [...evs].map((e) => e.scrollTop); el.innerHTML = h; el.scrollTop = st; el.querySelectorAll('.ev,.al').forEach((e, i) => { e.scrollTop = sc[i] || 0; }); lastHTML = h; }
       return;
     }
@@ -609,6 +632,11 @@
       case 'ovw': g = scrOvw(info.n); break;
       case 'ann': g = scrAnn('U' + info.n, 'UNIT' + info.n); break;
       case 'annsy': g = scrAnn('SY', 'SWITCHYARD'); break;
+      case 'annuss': g = scrAnn('USS', 'UNDERGROUND S/S'); break;
+      case 'annmss': g = scrAnn('MSS', 'MAIN CONTROL S/S'); break;
+      case 'annmp1': g = scrAnn('MP1', 'MIMIC PANEL (1/2)'); break;
+      case 'annmp2': g = scrAnn('MP2', 'MIMIC PANEL (2/2)'); break;
+      default: { const ex = EXTS[scr] || (info.ext && EXTU[info.base]); if (ex) g = ex.draw(info.n); }
     }
     $('svg').innerHTML = g;
   }
@@ -660,7 +688,7 @@
       case 'nav': go(r[0]); return;
       case 'navu': go(r[0] + curU); return;
       case 'tab': { const info = scrInfo(scr); const tabs = TABS[info.grp](info.n || curU).map((t) => t[0]); const i = tabs.indexOf(scr); go(tabs[(i + (+r[0]) + tabs.length) % tabs.length]); return; }
-      case 'na': dialog('MESSAGE', 'Layar / fungsi ini belum dimodelkan di simulator.', null); return;
+      case 'na': dialog('MESSAGE', NA_MSG[r.join(':')] || 'Layar / fungsi ini belum dimodelkan di simulator.', null); return;
       case 'dlg': closeDlg(); return;
       case 'zoom': if (r[0] === 'in') zoomBy(0.7); else if (r[0] === 'out') zoomBy(1 / 0.7); else if (r[0] === 'fit') fitW(); else setVB(null); return;
       case 'sim': simDialog(); return;
@@ -722,14 +750,15 @@
         dialog(`ANNUNCIATOR ${grp} ${w}`, items.length ? items.map((i) => `${i.on ? '●' : '○'} ${i.tag}  ${i.text}${i.on && !i.ack ? '  (UNACK)' : ''}`).join('\n') : 'Tidak ada titik alarm yang dimodelkan pada jendela ini.', null);
         return;
       }
-      case 'annack': P.alarms.ack(r[0]); render(); return;
-      case 'annrst': P.alarms.ack(r[0]); P.alarms.reset(false); render(); return;
+      case 'annack': P.alarms.ack(r[0] || undefined); render(); return;
+      case 'annrst': P.alarms.ack(r[0] || undefined); P.alarms.reset(false); render(); return;
       case 'fsu': fsUnit = +r[0]; render(); return;
       case 'fsel': selFault = r[0]; render(); return;
       case 'fx': { const sc = M.SCN[r[0]]; P.inject(r[0], fsUnit); if (!sc.unit) { } render(); return; }
+      case 'x': { const fn = EXTA[r[0]]; if (fn) { fn(r.slice(1)); render(); } return; }
       case 'init': if (r[0] === 'op') { P.initOperating(); hist2.length = 0; } else if (r[0] === 'stop') { P.initAllStop(); hist2.length = 0; } else P.clearAllFaults(); silenced.clear(); render(); return;
       case 'tru': trendU = +r[0]; $('html').innerHTML = ''; render(); return;
-      case 'trs': TS[+r[0]][3] = TS[+r[0]][3] ? 0 : 1; $('html').innerHTML = ''; render(); return;
+      case 'trs': { const A = trendU === 0 ? TSP : TS; A[+r[0]][3] = A[+r[0]][3] ? 0 : 1; } $('html').innerHTML = ''; render(); return;
     }
   }
   function simDialog() {
@@ -799,7 +828,7 @@
   let lastRec = -1, htmlTick = 0;
   function loop() {
     if (!paused && !document.hidden) P.tick(0.25 * mult);
-    if (P.t - lastRec >= 1) { lastRec = P.t; hist2.push({ t: P.t, u: P.units.map((u) => ({ speed: u.p.speed * 100, pp: u.p.p / 70 * 100, q: u.p.q, gv: u.p.gv, vt: u.p.vt * 100, thr: u.p.T.thrust, gp: u.p.govP * 100 })) }); if (hist2.length > 2000) hist2.splice(0, hist2.length - 2000); }
+    if (P.t - lastRec >= 1) { lastRec = P.t; hist2.push({ t: P.t, pl: { wl: P.intakeWL, rwl: P.dam ? P.dam.rwl : 0, qin: P.inflow, qsp: P.spillQ || 0, qt: P.units.reduce((a, u) => a + u.meas().flow, 0) }, u: P.units.map((u) => ({ speed: u.p.speed * 100, pp: u.p.p / 70 * 100, q: u.p.q, gv: u.p.gv, vt: u.p.vt * 100, thr: u.p.T.thrust, gp: u.p.govP * 100 })) }); if (hist2.length > 2000) hist2.splice(0, hist2.length - 2000); }
     $('sSim').textContent = 'SIM ' + fmtT(P.t) + (paused ? ' ❚❚' : ` x${mult}`);
     alarmBar();
     if (holdRender) return;
@@ -808,6 +837,8 @@
     render();
   }
   setInterval(() => { const d = new Date(); $('sDate').textContent = d.toDateString() + ' ' + d.toTimeString().slice(0, 8); }, 1000);
+  window.HMIX = { P, M, T, R, L, PL, lamp, mline, b3, vbox, navBox, title, backBtn, esc, f, U, dialog, closeDlg, go, render: () => render(), fmtT, arR, arU,
+    EXTS, EXTU, EXTA, TABS, NA_MSG, get scr() { return scr; } };
   window.hmiBack = () => { if (!$('dlg').classList.contains('hidden')) { closeDlg(); return true; } if (vb && vb.w < VB0.w - 1) { fitW(); return true; } if (scr !== 'main') { go('back'); return true; } return false; };
   window.hmiPause = () => { };
   window.__plant = P;

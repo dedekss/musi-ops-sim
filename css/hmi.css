@@ -208,3 +208,26 @@ html,body{-webkit-text-size-adjust:100%;-webkit-user-select:none;user-select:non
 .rph{width:46px;height:78px;border:3px solid #4ce0ff;border-radius:9px;margin:0 auto 18px;animation:rph 2.4s ease-in-out infinite}
 @keyframes rph{0%,25%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
 @media (orientation:portrait) and (max-width:600px){ .rotate{display:flex} }
+
+/* ===== station service / dam (hmi-ss.js) ===== */
+#svg .l20{stroke:#ff8c1a;stroke-width:2;fill:none}
+#svg .l04{stroke:#ffe14d;stroke-width:2;fill:none}
+#svg .l11{stroke:#2ec5e8;stroke-width:2;fill:none}
+#svg .ldd{stroke:#4a4a4a;stroke-width:2;fill:none}
+#svg .lbus{stroke-width:3.2}
+#svg .rly rect{fill:#9a9a9a;stroke:#e0e0e0;stroke-width:1}
+#svg .rly text{fill:#202020;font-size:9.5px;text-anchor:middle}
+#svg .rly.on rect{fill:#ff2020}
+#svg .rly.on text{fill:#fff}
+#svg .trip rect,#svg .trip circle{animation:blinkFill 1s steps(2) infinite}
+#svg .water{fill:#0a3a6a;stroke:#2ec5e8;stroke-width:1}
+#svg .gate{fill:#b4b4b4;stroke:#fff;stroke-width:1}
+#svg .barbg{fill:#111;stroke:#888;stroke-width:1}
+#svg .barfg{fill:#2ec5e8}
+#svg .barfr{fill:#ff4040}
+.tbl{border-collapse:collapse;width:100%;font-size:11.5px;margin-bottom:8px}
+.tbl th,.tbl td{border:1px solid #333;padding:3px 6px;text-align:left}
+.tbl th{color:var(--cyan);font-weight:400;background:#0b0b0b}
+.tbl td.n{text-align:right;font-variant-numeric:tabular-nums}
+.tbl tr.alm td{color:#ff7070}
+.note2{color:#999;font-size:11px;line-height:1.5;margin:6px 0}
