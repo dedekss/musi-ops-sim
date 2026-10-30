@@ -41,7 +41,7 @@
     alm: { no: '00094', title: () => 'ALARM SUMMARY', grp: 'ins', html: true },
     trend: { no: '00097', title: () => 'TREND GRAPH', grp: 'ins', html: true },
     prot: { no: '00098', title: () => 'PROTECTION SCHEME (86 LOCKOUT)', grp: 'ins', html: true },
-    fault: { no: '00099', title: () => 'FAULT SIMULATION (INSTRUCTOR)', grp: 'ins', html: true },
+    fault: { no: '00099', title: () => 'SKENARIO & INISIALISASI (INSTRUKTUR)', grp: 'ins', html: true },
     annsy: { no: '00076', title: () => 'SWITCHYARD ANN', grp: 'ann' },
     annuss: { no: '00074', title: () => 'UNDERGROUND S/S ANN', grp: 'ann' },
     annmss: { no: '00075', title: () => 'MAIN CONTROL S/S ANN', grp: 'ann' },
@@ -74,7 +74,7 @@
     sys: (n) => [[`ovw${n}`, `NO.${n} WATER FLOW`], [`cap${n}`, 'CAPABILITY CURVE'], [`vib${n}`, 'VIBRATION'], [`ai${n}`, 'ANALOG INPUT'], ['trend', 'Historical']],
     ctl: () => [['sy', '150kV SY'], ['ctl1', 'NO.1 CONTROL PNL'], ['ctl2', 'NO.2 CONTROL PNL'], ['ctl3', 'NO.3 CONTROL PNL'], ['trend', 'Historical']],
     ann: () => [['ann1', 'UNIT1 ANN'], ['ann2', 'UNIT2 ANN'], ['ann3', 'UNIT3 ANN'], ['annuss', 'USS ANN'], ['annmss', 'MSS ANN'], ['annsy', 'SWITCHYARD ANN'], ['annmp1', 'MIMIC 1/2'], ['annmp2', 'MIMIC 2/2'], ['alm', 'AlmSum']],
-    ins: () => [['fault', 'FAULT SIM.'], ['prot', 'PROTECTION'], ['alm', 'ALARM SUM.'], ['trend', 'TREND']],
+    ins: () => [['jza1', 'FAULT SIM. JEZ2K031'], ['force', 'FORCING I/O'], ['fault', 'SKENARIO/INIT'], ['prot', 'PROTECTION'], ['alm', 'ALARM SUM.'], ['trend', 'TREND']],
   };
   function go(id, push = true) {
     if (id === 'back') { id = hist.pop() || 'main'; push = false; }
@@ -96,36 +96,34 @@
   /* =========================== MAIN SCREEN =========================== */
   function scrMain() {
     let g = '';
-    const pk = (y, s) => R(12, y, 140, 21, '', 'fill="#ff40ff" stroke="#000"') + T(82, y + 15, s, 'tc', 'style="fill:#200020;font-size:11px"');
+    const pk = (y, s) => R(12, y, 140, 21, '', 'fill="#000" stroke="#bbb"') + T(82, y + 15, s, 'tc', 'style="fill:#e8e8e8;font-size:11px"');
     g += pk(3, 'PLN IP') + pk(26, 'UBP') + pk(49, 'BENGKULU');
-    g += R(165, 15, 700, 45, '', 'fill="#ff40ff" stroke="#fff" stroke-width="3"') + T(515, 46, 'Musi Hydro Electric Power Station Graphic Menu', 'tc', 'style="fill:#fff;font-size:22px;font-weight:bold"');
-    g += `<g data-a="nav:fault">${R(877, 6, 104, 18, '', 'fill="#ff6060" stroke="#000"')}${T(929, 19, 'FAULT SIM.', 'tc', 'style="fill:#000;font-size:10px"')}</g>`;
-    g += `<g data-a="nav:prot">${R(877, 27, 104, 18, '', 'fill="#ff9090" stroke="#000"')}${T(929, 40, 'PROTECTION', 'tc', 'style="fill:#000;font-size:10px"')}</g>`;
-    g += `<g data-a="nav:trend">${R(877, 48, 104, 18, '', 'fill="#c0c0ff" stroke="#000"')}${T(929, 61, 'TREND', 'tc', 'style="fill:#000;font-size:10px"')}</g>`;
+    g += R(165, 15, 700, 45, '', 'fill="#000" stroke="#bbb" stroke-width="2"') + T(515, 46, 'Musi Hydro Electric Power Station Graphic Menu', 'tc', 'style="fill:#e8e8e8;font-size:22px;letter-spacing:.04em"');
+    [['jza1', 'FAULT SIM.'], ['force', 'FORCING I/O'], ['prot', 'PROTECTION'], ['trend', 'TREND']].forEach(([k, l], i) => { g += b3(877, 3 + i * 17, 104, 15, l, '', `nav:${k}`); });
     const sec = (y, h, lab, rows, col, extra = '') => {
-      let s = R(10, y, 255, h, '', 'fill="#202020" stroke="#bbb"') + R(275, y, 705, h, '', 'fill="#202020" stroke="#bbb"');
-      s += extra || T(137, y + h / 2 + 6, lab, 'tc', 'style="fill:#ff40ff;font-size:15px"');
+      let s = R(10, y, 255, h, '', 'fill="#000" stroke="#bbb"') + R(275, y, 705, h, '', 'fill="#000" stroke="#bbb"');
+      s += extra || T(137, y + h / 2 + 6, lab, 'tc', 'style="fill:#e8e8e8;font-size:15px"');
       rows.forEach((r, ri) => r.forEach((b, ci) => { if (!b) return; const [lb, act] = b; const x = 284 + ci * 173, yy = y + 6 + ri * 24;
-        s += `<g class="menu ${act ? '' : 'na'}" data-a="${act || 'na:' + lb}">${R(x, yy, 163, 18, '', `fill="${col}"`)}${T(x + 81, yy + 13, lb)}</g>`; }));
+        s += b3(x, yy, 163, 18, lb, act ? '' : 'dis', act || 'na:' + lb); }));
       return s;
     };
     g += sec(76, 52, 'Annunciator', [[['Unit No.1', 'nav:ann1'], ['Unit No.2', 'nav:ann2'], ['Unit No.3', 'nav:ann3'], ['Mimic Panel (1/2)', 'nav:annmp1']], [['Station Service (USS)', 'nav:annuss'], ['Station Service (MSS)', 'nav:annmss'], ['Switchyard', 'nav:annsy'], ['Mimic Panel (2/2)', 'nav:annmp2']]], '#ffff40');
     g += sec(138, 34, 'Station View', [[['Station Service Overview', 'nav:sso'], ['150kV Switchyard', 'nav:sy'], ['Main Control House', 'nav:mch'], ['Underground Powerhouse', 'nav:uph']]], '#40ffff');
     const tot = P.units.reduce((a, u) => ({ p: a.p + (u.p.cb ? u.p.p : 0), q: a.q + (u.p.cb ? u.p.q : 0) }), { p: 0, q: 0 });
     g += sec(182, 76, '', [[['SY/SS Control Panel', 'nav:ssc'], ['Air Supply System', 'nav:air'], ['Intake & Reregulating Dam', 'nav:dam'], ['Rain Fall Monitor', 'nav:rain']], [['Schedule(Rainy/Weekday)', 'nav:sch1'], ['Schedule(Rainy/Weekend)', 'nav:sch2'], ['Schedule(Arbitrary Setup)', 'nav:sch5'], ['Daily Power Operation', 'nav:dpo']], [['Schedule(Dry/Weekday)', 'nav:sch3'], ['Schedule(Dry/Weekend)', 'nav:sch4'], ['Water Level Control', 'nav:wlc'], ['Station Service Overview', 'nav:sso']]], '#40ff40',
-      T(55, 225, 'Common', 'tc', 'style="fill:#ff40ff;font-size:15px"') + L(100, 182, 100, 258, 'ln') + T(150, 208, f(tot.p, 1) + '  MW', 't', 'style="fill:#ff40ff"') + T(150, 228, f(tot.q, 1) + '  MVar', 't', 'style="fill:#ff40ff"') + T(150, 248, 'WL ' + f(P.intakeWL, 2), 't', 'style="fill:#ff40ff"'));
+      T(55, 225, 'Common', 'tc', 'style="fill:#e8e8e8;font-size:15px"') + L(100, 182, 100, 258, 'ln') + T(150, 208, f(tot.p, 1) + '  MW', 't cy') + T(150, 228, f(tot.q, 1) + '  MVar', 't cy') + T(150, 248, 'WL ' + f(P.intakeWL, 2), 't cy'));
     [1, 2, 3].forEach((n, i) => {
       const u = U(n), m = u.meas(), y = 268 + i * 84;
       g += sec(y, 76, '', [[['Control Panel', `nav:ctl${n}`], ['Capability Curve', `nav:cap${n}`]], [['Water Flow System', `nav:ovw${n}`], ['Turbine Actuator', `nav:tact${n}`], ['Inlet Valve Hydraulic', `nav:ivh${n}`], ['Vibration Monitor', `nav:vib${n}`]],
         [['Start Condition(1/2)', `nav:sc1${n}`], ['Start Condition(2/2)', `nav:sc2${n}`], ['Stop To Load', `nav:s2l${n}`], ['Load To Stop', `nav:l2s${n}`]]], '#40ff40',
-        T(50, y + 44, `Unit No.${n}`, 'tc', 'style="fill:#ff40ff;font-size:15px"') + L(98, y, 98, y + 76, 'ln') +
-        T(108, y + 22, `${f(m.p)} MW`, 't', 'style="fill:#ff40ff"') + T(190, y + 22, `${f(m.I, 0)} A`, 't', 'style="fill:#ff40ff"') +
-        T(108, y + 44, `${f(m.q)} MVar`, 't', 'style="fill:#ff40ff"') + T(190, y + 44, `${f(m.kv)} kV`, 't', 'style="fill:#ff40ff"') +
-        T(108, y + 66, `${f(m.rpm)} RPM`, 't', 'style="fill:#ff40ff"') + T(190, y + 66, M.STEP[u.pos], 't', 'style="fill:#ffff80;font-size:9px"'));
+        T(50, y + 44, `Unit No.${n}`, 'tc', 'style="fill:#e8e8e8;font-size:15px"') + L(98, y, 98, y + 76, 'ln') +
+        T(108, y + 22, `${f(m.p)} MW`, 't cy') + T(190, y + 22, `${f(m.I, 0)} A`, 't cy') +
+        T(108, y + 44, `${f(m.q)} MVar`, 't cy') + T(190, y + 44, `${f(m.kv)} kV`, 't cy') +
+        T(108, y + 66, `${f(m.rpm)} RPM`, 't cy') + T(190, y + 66, M.STEP[u.pos], 't', 'style="fill:#ffff40;font-size:9px"'));
     });
     g += sec(522, 52, 'Analog Input', [[['Unit No.1', 'nav:ai1'], ['Unit No.2', 'nav:ai2'], ['Unit No.3', 'nav:ai3']], [['Station Service (USS)', 'nav:aiuss'], ['Station Service (MSS)', 'nav:aimss'], ['Switchyard', 'nav:aisy'], ['Intake & Reregulating Dam', 'nav:aidam']]], '#ffa040');
     g += T(495, 600, 'Semua menu aktif. Nilai bertanda ASUMSI di layar = data belum tersedia di dokumen PLTA Musi.', 'tc dim', 'style="font-size:10px"');
-    g += T(495, 616, 'Instruktur: FAULT SIM. (kanan atas) untuk inisialisasi kondisi & injeksi gangguan.', 'tc dim', 'style="font-size:10px"');
+    g += T(495, 616, 'FAULT SIM. (kanan atas) = block diagram proteksi JEZ2K031: aktifkan sendiri input yang diinginkan.', 'tc dim', 'style="font-size:10px"');
     return g;
   }
 
@@ -399,11 +397,14 @@
       ['TURBINE GUIDE BEARING METAL TEMPERATURE', T_.tgb], ['TURBINE GUIDE BEARING OIL TEMPERATURE', T_.tgbOil], ['COOLING WATER OUTLET TEMPERATURE', T_.cwOut]];
     const rtd2 = [['COOLING WATER INLET TEMPERATURE', T_.cwIn], ['MAIN TRANSFORMER WINDING TEMPERAURE', T_.mtrWdg], ['MAIN TRANSFORMER OIL TEMPERAURE', T_.mtrOil], ['GENERATOR ROOM', P.pc.amb('uph') + 2.5]];
     const RH = 17.5;
-    const tbl = (x, y, rows, pre, w1, w2, unitDefault) => rows.map((r, i) => { const yy = y + i * RH; return R(x, yy, 62, RH, 'box') + T(x + 3, yy + 12.5, `${n}${pre}${String(i + 1).padStart(4, '0')}`, 'ts') + R(x + 62, yy, w1 - 62, RH, 'box') + T(x + 66, yy + 12.5, r[0], 'ts') +
-      R(x + w1 + 10, yy, w2, RH, 'box') + T(x + w1 + w2 - 40, yy + 12.5, typeof r[1] === 'number' ? f(r[1]) : r[1], 'ts tr') + T(x + w1 + w2 - 34, yy + 12.5, r[2] !== undefined ? r[2] : unitDefault, 'ts'); }).join('');
-    g += tbl(10, 46, ai, 'AI', 355, 120, '') + tbl(500, 46, ai2.map((r, i) => r), 'AI', 355, 120, '').replace(/>(\d)AI(\d{4})</g, (s0, a, b) => `>${a}AI${String(+b + 16).padStart(4, '0')}<`);
+    const tbl = (x, y, rows, pre, w1, w2, unitDefault, off = 0) => rows.map((r, i) => { const yy = y + i * RH, tg = `${n}${pre}${String(i + 1 + off).padStart(4, '0')}`, fv = window.FRC_AI && window.FRC_AI[tg];
+      return R(x, yy, 62, RH, 'box') + T(x + 3, yy + 12.5, tg, 'ts') + R(x + 62, yy, w1 - 62, RH, 'box') + T(x + 66, yy + 12.5, r[0], 'ts') +
+      R(x + w1 + 10, yy, w2, RH, 'box', fv !== undefined ? 'style="stroke:#ffd000;stroke-width:2"' : '') + T(x + w1 + w2 - 40, yy + 12.5, fv !== undefined ? f(fv) : typeof r[1] === 'number' ? f(r[1]) : r[1], 'ts tr', fv !== undefined ? 'style="fill:#ffd000"' : '') + T(x + w1 + w2 - 34, yy + 12.5, r[2] !== undefined ? r[2] : unitDefault, 'ts'); }).join('');
+    if (window.__aiCol) { ai.forEach((r, i) => window.__aiCol.push([`${n}AI${String(i + 1).padStart(4, '0')}`, r[0], r[1], r[2]])); ai2.forEach((r, i) => window.__aiCol.push([`${n}AI${String(i + 17).padStart(4, '0')}`, r[0], r[1], r[2]]));
+      rtd.forEach((r, i) => window.__aiCol.push([`${n}RTD${String(i + 1).padStart(4, '0')}`, r[0], r[1], '℃'])); rtd2.forEach((r, i) => window.__aiCol.push([`${n}RTD${String(i + 16).padStart(4, '0')}`, r[0], r[1], '℃'])); }
+    g += tbl(10, 46, ai, 'AI', 355, 120, '') + tbl(500, 46, ai2, 'AI', 355, 120, '', 16);
     g += T(495, 340, '---  RTD INPUT  ---', 't tc');
-    g += tbl(10, 346, rtd, 'RTD', 355, 120, '℃') + tbl(500, 346, rtd2, 'RTD', 355, 120, '℃').replace(/>(\d)RTD(\d{4})</g, (s0, a, b) => `>${a}RTD${String(+b + 15).padStart(4, '0')}<`);
+    g += tbl(10, 346, rtd, 'RTD', 355, 120, '℃') + tbl(500, 346, rtd2, 'RTD', 355, 120, '℃', 15);
     return g;
   }
 
@@ -538,10 +539,10 @@
     const u = U(fsUnit);
     const lo = ['86-1', '86-2', '86-4', '86-5', '86-T', '86-PC'].map((k) => `<div class="${u.lo[k] ? 'on' : ''}" data-a="rst:${fsUnit}:${k}" title="${esc(M.RESET_RULE[k])}"><i></i>${k}${u.lo[k] ? `<span style="font-size:10px;color:#ff9090"> RESET</span>` : ''}</div>`).join('');
     const loCause = Object.entries(u.lo).filter((e) => e[1]).map(([k, v]) => `<div class="ALARM">${k}: ${esc(v)}</div>`).join('') || '<div style="color:#30e030">Tidak ada lockout aktif</div>';
-    const ev = P.events.slice(-60).reverse().filter((e) => e.msg.startsWith(`U${fsUnit}:`) || e.msg.startsWith('SY:') || e.msg.startsWith('FAULT') || e.msg.includes('KEHILANGAN')).slice(0, 30)
+    const ev = P.events.slice(-60).reverse().filter((e) => e.msg.startsWith(`U${fsUnit}:`) || e.msg.startsWith('SY:') || e.msg.startsWith('FAULT') || e.msg.startsWith('INSTRUKTUR') || e.msg.includes('KEHILANGAN')).slice(0, 30)
       .map((e) => `<div class="${e.type}">${fmtT(e.t)} ${esc(e.msg)}</div>`).join('');
     const act = sc.unit ? P.activeFault(sc.key, fsUnit) : P.activeFault(sc.key);
-    return `<div class="h2">FAULT SIMULATION (INSTRUCTOR)</div><div class="fs">
+    return `<div class="h2">SKENARIO & INISIALISASI (INSTRUKTUR)</div><div class="row" style="margin:4px 0"><span class="sb" data-a="nav:jza1" style="background:#ffd040;color:#000;padding:4px 8px;cursor:pointer">▶ FAULT SIM. – BLOCK DIAGRAM PROTEKSI JEZ2K031 (SH.001 / 002 / 003)</span></div><div class="fs">
       <div class="col">
         <h4>INISIALISASI</h4><div class="row"><span class="sb" data-a="init:op">OPERASI (U1 / U2 / U3 = 70 MW)</span><span class="sb" data-a="init:stop">SEMUA STAND STILL</span><span class="sb" data-a="init:clr">HAPUS SEMUA GANGGUAN</span></div>
         <h4>UNIT TARGET</h4><div class="row">${unitList}</div>
@@ -764,7 +765,7 @@
   function simDialog() {
     const sp = SPEEDS.map((s) => `<button data-a="spd:${s}" class="${mult === s ? 'on' : ''}">x${s}</button>`).join('');
     dialog('SIMULATOR', `Waktu simulasi ${fmtT(P.t)}\nKecepatan x${mult} ${paused ? '(PAUSE)' : ''}`, null,
-      { extra: `<div class="simgrid">${sp}<button data-a="pause" class="${paused ? 'on' : ''}">${paused ? 'RESUME' : 'PAUSE'}</button></div><div class="simgrid"><button data-a="nav:fault">FAULT SIM.</button><button data-a="init:op">INIT OPERASI</button><button data-a="init:stop">INIT STOP</button></div>` });
+      { extra: `<div class="simgrid">${sp}<button data-a="pause" class="${paused ? 'on' : ''}">${paused ? 'RESUME' : 'PAUSE'}</button></div><div class="simgrid"><button data-a="nav:jza1">FAULT SIM.</button><button data-a="init:op">INIT OPERASI</button><button data-a="init:stop">INIT STOP</button></div>` });
   }
   // klik ditangani via pointerdown/up: tahan terhadap render ulang 250 ms (elemen diganti di tengah ketukan)
   let pd = null, holdRender = false;
@@ -807,14 +808,14 @@
   function zoomBy(fac) { const r = svg.getBoundingClientRect(); zoomAt(fac, r.left + r.width / 2, r.top + r.height / 2); }
   svg.addEventListener('wheel', (e) => { e.preventDefault(); zoomAt(e.deltaY > 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY); }, { passive: false });
   let md = null;
-  svg.addEventListener('mousedown', (e) => { if (vb) md = { x: e.clientX, y: e.clientY, vb: { ...vb }, mv: false }; });
+  svg.addEventListener('mousedown', (e) => { if (window.__flDrag) return; if (vb) md = { x: e.clientX, y: e.clientY, vb: { ...vb }, mv: false }; });
   addEventListener('mousemove', (e) => { if (!md) return; const dx = e.clientX - md.x, dy = e.clientY - md.y; if (Math.abs(dx) + Math.abs(dy) > 6) md.mv = true; const k = md.vb.w / svg.getBoundingClientRect().width; setVB({ x: md.vb.x - dx * k, y: md.vb.y - dy * k, w: md.vb.w }); });
   addEventListener('mouseup', () => { if (md && md.mv) noClickUntil = performance.now() + 250; md = null; });
   let tg = null, lastTap = 0; const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
   svg.addEventListener('touchstart', (e) => { const t = e.touches;
     if (t.length === 2) { tg = { m: 'p', d0: dist(t[0], t[1]), cx: (t[0].clientX + t[1].clientX) / 2, cy: (t[0].clientY + t[1].clientY) / 2, vb: { ...cur() }, mv: true }; e.preventDefault(); }
     else if (t.length === 1) tg = { m: 'd', x: t[0].clientX, y: t[0].clientY, vb: { ...cur() }, mv: false }; }, { passive: false });
-  svg.addEventListener('touchmove', (e) => { if (!tg) return; const t = e.touches, rc = svg.getBoundingClientRect();
+  svg.addEventListener('touchmove', (e) => { if (!tg || window.__flDrag) return; const t = e.touches, rc = svg.getBoundingClientRect();
     if (tg.m === 'p' && t.length === 2) { e.preventDefault(); const d = dist(t[0], t[1]), w = tg.vb.w * tg.d0 / Math.max(d, 1), cx = (t[0].clientX + t[1].clientX) / 2, cy = (t[0].clientY + t[1].clientY) / 2, k0 = tg.vb.w / rc.width, k1 = w / rc.width;
       const sx = tg.vb.x + (tg.cx - rc.left) * k0, sy = tg.vb.y + (tg.cy - rc.top) * k0; setVB({ x: sx - (cx - rc.left) * k1, y: sy - (cy - rc.top) * k1, w }); }
     else if (tg.m === 'd' && t.length === 1) { const dx = t[0].clientX - tg.x, dy = t[0].clientY - tg.y; if (Math.abs(dx) + Math.abs(dy) > 10) tg.mv = true; if (vb && tg.mv) { e.preventDefault(); const k = tg.vb.w / rc.width; setVB({ x: tg.vb.x - dx * k, y: tg.vb.y - dy * k, w: tg.vb.w }); } } }, { passive: false });
@@ -837,8 +838,8 @@
     render();
   }
   setInterval(() => { const d = P.pc ? new Date(P.pc.nowMs()) : new Date(); $('sDate').textContent = d.toDateString() + ' ' + d.toTimeString().slice(0, 8); }, 1000);
-  window.HMIX = { P, M, T, R, L, PL, lamp, mline, b3, vbox, navBox, title, backBtn, esc, f, U, dialog, closeDlg, go, render: () => render(), fmtT, arR, arU,
-    EXTS, EXTU, EXTA, TABS, NA_MSG, get scr() { return scr; } };
+  window.HMIX = { scrAI, P, M, T, R, L, PL, lamp, mline, b3, vbox, navBox, title, backBtn, esc, f, U, dialog, closeDlg, go, render: () => render(), fmtT, arR, arU,
+    EXTS, EXTU, EXTA, TABS, NA_MSG, get scr() { return scr; }, hold: (v) => { holdRender = !!v; } };
   window.hmiBack = () => { if (!$('dlg').classList.contains('hidden')) { closeDlg(); return true; } if (vb && vb.w < VB0.w - 1) { fitW(); return true; } if (scr !== 'main') { go('back'); return true; } return false; };
   window.hmiPause = () => { };
   window.__plant = P;

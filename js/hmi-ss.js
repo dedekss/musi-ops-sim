@@ -547,8 +547,9 @@
     const RH = 18, sp = ['SPARE', '0', ''];
     const full = (a, n) => { const r = a.slice(); while (r.length < n) r.push(sp); return r; };
     const A = full(ai, 46), Rt = full(rtd, 16);
-    const row = (x, y, tag, r) => R(x, y, 60, RH, 'box') + T(x + 3, y + 13, tag, 'ts') + R(x + 60, y, 282, RH, 'box') + T(x + 64, y + 13, r[0], 'ts') + R(x + 352, y, 106, RH, 'box') +
-      T(x + 412, y + 13, r[1], 'ts tr') + T(x + 418, y + 13, r[2], 'ts');
+    const row = (x, y, tag, r) => { const fv = window.FRC_AI && window.FRC_AI[tag]; if (window.__aiCol && r[0] !== 'SPARE') window.__aiCol.push([tag, r[0], r[1], r[2]]);
+      return R(x, y, 60, RH, 'box') + T(x + 3, y + 13, tag, 'ts') + R(x + 60, y, 282, RH, 'box') + T(x + 64, y + 13, r[0], 'ts') + R(x + 352, y, 106, RH, 'box', fv !== undefined ? 'style="stroke:#ffd000;stroke-width:2"' : '') +
+      T(x + 412, y + 13, fv !== undefined ? f(fv) : r[1], 'ts tr', fv !== undefined ? 'style="fill:#ffd000"' : '') + T(x + 418, y + 13, r[2], 'ts'); };
     for (let i = 0; i < 23; i++) { g += row(10, 42 + i * RH, `${pre}AI${String(i + 1).padStart(4, '0')}`, A[i]) + row(483, 42 + i * RH, `${pre}AI${String(i + 24).padStart(4, '0')}`, A[i + 23]); }
     g += T(495, 469, '---  RTD INPUT  ---', 't tc');
     for (let i = 0; i < 8; i++) { g += row(10, 474 + i * RH, `${pre}RTD${String(i + 1).padStart(4, '0')}`, Rt[i]) + row(483, 474 + i * RH, `${pre}RTD${String(i + 9).padStart(4, '0')}`, Rt[i + 8]); }
@@ -786,6 +787,7 @@
     return `<div class="h2">ANALOG INPUT – INTAKE & RE-REGULATING DAM</div><table class="tbl" style="max-width:720px;margin:0 auto"><tr><th>Titik</th><th>Nilai</th></tr>${rows.map((r) => tr(r)).join('')}</table>
       <div class="row" style="justify-content:center;display:flex;gap:6px"><span class="sb" data-a="nav:dam" style="background:#b4b4b4;color:#111;padding:4px 8px;cursor:pointer">INTAKE & RE-DAM ▶</span></div>`;
   }
+  window.HMIX_AI = { 4: () => aiUSS(), 5: () => aiMSS(), 6: () => aiSY() };
   /* ============================== REGISTRASI ============================== */
   Object.assign(EXTS, {
     sso: { no: '00005', title: () => 'STATION SERVICE OVERVIEW', grp: 'stv', draw: scrSSO },

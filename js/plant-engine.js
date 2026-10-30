@@ -186,6 +186,118 @@
   /* ===================================================================== */
   /*  UNIT                                                                 */
   /* ===================================================================== */
+  /* ===================================================================== */
+  /*  JEZ2K031 – PROTECTION SCHEME FOR GENERATOR (SH.001 / SH.002 / SH.003) */
+  /* ===================================================================== */
+  // Setiap input = satu kotak pada gambar JEZ2K031. model(u, T) = nilai dari model plant (T = timer helper);
+  // instruktur dapat memaksa input ON/OFF (u.jf) atau mengubah nilai analog di belakangnya (u.ja).
+  // ana: variabel analog yang diukur sensor input tsb (lim = setelan; dir '>' / '<').
+  const ANA = {
+    thrust: { name: 'Suhu thrust bearing metal', unit: '℃', get: (u) => u.p.T.thrust, set: (u, v) => { u.p.T.thrust = v; }, rate: 2 },
+    ugb: { name: 'Suhu upper guide bearing metal', unit: '℃', get: (u) => u.p.T.ugb, set: (u, v) => { u.p.T.ugb = v; }, rate: 2 },
+    lgb: { name: 'Suhu lower guide bearing metal', unit: '℃', get: (u) => u.p.T.lgb, set: (u, v) => { u.p.T.lgb = v; }, rate: 2 },
+    tgb: { name: 'Suhu turbine guide bearing metal', unit: '℃', get: (u) => u.p.T.tgb, set: (u, v) => { u.p.T.tgb = v; }, rate: 2 },
+    acOut: { name: 'Suhu udara keluar air cooler', unit: '℃', get: (u) => u.p.T.acOut, set: (u, v) => { u.p.T.acOut = v; }, rate: 2 },
+    acIn: { name: 'Suhu udara masuk air cooler', unit: '℃', get: (u) => u.p.T.acIn, set: (u, v) => { u.p.T.acIn = v; }, rate: 2 },
+    mtrOil: { name: 'Suhu oli M.Tr', unit: '℃', get: (u) => u.p.T.mtrOil, set: (u, v) => { u.p.T.mtrOil = v; }, rate: 2 },
+    mtrWdg: { name: 'Suhu belitan M.Tr', unit: '℃', get: (u) => u.p.T.mtrWdg, set: (u, v) => { u.p.T.mtrWdg = v; }, rate: 2 },
+    govP: { name: 'Tekanan oli sistem governor', unit: '%', get: (u) => u.p.govP * 100, set: (u, v) => { u.p.govP = clamp(v / 100, 0, 1.1); }, rate: 5 },
+    govLvl: { name: 'Level oli tangki tekanan governor', unit: '%', get: (u) => u.p.govLvl * 100, set: (u, v) => { u.p.govLvl = clamp(v / 100, 0, 1.2); }, rate: 5 },
+    sumpT: { name: 'Suhu oli sump tank governor', unit: '℃', get: (u) => u.govSumpT(), set: () => {}, rate: 2 },
+    tgbOil: { name: 'Level oli turbine guide bearing', unit: '%', get: (u) => u.tgbOilLvl() * 100, set: () => {}, rate: 5 },
+    f_tb: { name: 'Aliran air pendingin turbine bearing', unit: '%', get: (u) => u.p.f_tb * 100, set: (u, v) => { u.p.f_tb = clamp(v / 100, 0, 1.2); }, rate: 20 },
+    f_sc: { name: 'Aliran air pendingin shaft seal', unit: '%', get: (u) => u.p.f_sc * 100, set: (u, v) => { u.p.f_sc = clamp(v / 100, 0, 1.2); }, rate: 20 },
+    vt: { name: 'Tegangan generator', unit: '%', get: (u) => u.p.vt * 100, set: (u, v) => { u.p.vt = clamp(v / 100, 0, 1.4); }, rate: 10 },
+    intake: { name: 'Muka air intake dam', unit: 'El.m', plant: true, get: (u) => u.plant.intakeWL, set: (u, v) => { u.plant.intakeWL = v; }, rate: 0.3 },
+  };
+  for (const [k, nm] of [['ubv', 'Getaran upper bracket V'], ['ubh', 'Getaran upper bracket H'], ['lbv', 'Getaran lower bracket V'], ['lbh', 'Getaran lower bracket H'], ['hcv', 'Getaran head cover V'], ['hch', 'Getaran head cover H'],
+    ['ugx', 'Run-out upper shaft X'], ['ugy', 'Run-out upper shaft Y'], ['lgx', 'Run-out lower shaft X'], ['lgy', 'Run-out lower shaft Y'], ['tgx', 'Run-out turbine shaft X'], ['tgy', 'Run-out turbine shaft Y']]) {
+    ANA[k] = { name: nm, unit: /^h/.test(k) ? 'mm/s' : 'µm', get: (u) => u.p.vib[k], set: (u, v) => { u.p.vib[k] = Math.max(0, v); }, rate: /^h/.test(k) ? 2 : 30 };
+  }
+  const JZ = {};
+  const jz = (id, o) => { JZ[id] = Object.assign({ id, soe: id, model: () => false }, o); };
+  const A_ = (ana, dir, lim, d) => ({ ana, dir, lim, model: (u, T) => { const v = ANA[ana].get(u), c = dir === '>' ? v > lim : v < lim; return d ? T(id_ana(ana, dir, lim), c, d) : c; } });
+  const id_ana = (a, d, l) => `a_${a}${d}${l}`;
+  // ---------- SH.001 ----------
+  jz('DI0119', { sh: 1, dev: 'M3425A-1', lab: 'GENERATOR GROUND OVER VOLTAGE', code: '64V' });
+  jz('DI0117', { sh: 1, dev: 'M3425A-1', lab: 'GENERATOR GROUND FAULT', code: '64VS' });
+  jz('DI0116', { sh: 1, dev: 'M3425A-1', lab: 'GENERATOR DIFFERENTIAL', code: '87', model: (u) => !!u.fx.gen_87 && u.p.vt > 0.3 });
+  jz('DI0118', { sh: 1, dev: 'M3425A-1', lab: 'GENERATOR OVER CURRENT', code: '51', model: (u, T) => T('g51', !!u.fx.gen_51 && u.p.cb, 1.5) });
+  jz('DI0120', { sh: 1, dev: 'M3425A-1', lab: 'GROUND OVER VOLTAGE', code: '64T' });
+  jz('M1PS', { sh: 1, dev: 'M3425A-1', lab: 'PROTECTION RELAY POWER SUPPLY ALARM', soe: 'DI0127' });
+  jz('M1ST', { sh: 1, dev: 'M3425A-1', lab: 'PROTECTION RELAY SELF-TEST ALARM', soe: 'DI0127' });
+  jz('DI0125', { sh: 1, dev: 'M3425A-2', lab: 'NEGATIVE SEQUENCE OVERCURRENT', code: '46', model: (u, T) => T('g46', !!u.fx.gen_46 && u.p.cb, 1) });
+  jz('DI0124', { sh: 1, dev: 'M3425A-2', lab: 'GENERATOR LOSS OF FIELD RELAY', code: '40', model: (u, T) => T('g40', !!u.fx.gen_40 && u.p.cb && u.p.q < -0.35 * PR, 1) });
+  jz('DI0121', Object.assign({ sh: 1, dev: 'M3425A-2', lab: 'GENERATOR OVERVOLTAGE RELAY', code: '59' }, A_('vt', '>', 112, 2)));
+  jz('DI0122', { sh: 1, dev: 'M3425A-2', lab: 'GENERATOR UNDERVOLTAGE RELAY', code: '27', model: (u, T) => T('g27', !!u.fx.gen_27 && u.p.cb, 3) });
+  jz('DI0123', { sh: 1, dev: 'M3425A-2', lab: 'GENERATOR FIELD GROUND FAULT', code: '64E', model: (u) => !!u.fx.gen_64e && u.p.fcb });
+  jz('M2PS', { sh: 1, dev: 'M3425A-2', lab: 'PROTECTION RELAY POWER SUPPLY ALARM', soe: 'DI0128' });
+  jz('M2ST', { sh: 1, dev: 'M3425A-2', lab: 'PROTECTION RELAY SELF-TEST ALARM', soe: 'DI0128' });
+  jz('DI0126', { sh: 1, dev: 'UPRB', lab: 'OVERCURRENT RELAY FOR EXCITATION CIRCUIT', code: '51E', model: (u) => !!u.fx.exc_51e && u.p.fcb });
+  jz('DI0082', { sh: 1, dev: 'AVR', lab: 'EXCITATION SYSTEM HEAVY FAULT', model: (u) => !!u.fx.exc_heavy && u.p.excOn });
+  jz('DI0314', { sh: 1, dev: 'CO2 F.F', lab: 'GENERATOR FIRE', model: (u) => !!u.fx.gen_fire });
+  jz('DI0181', Object.assign({ sh: 1, dev: 'THERMO-METER PANEL', lab: 'UPPER GUIDE BEARING TEMP. HIGH 2ND' }, A_('ugb', '>', 75)));
+  jz('DI0182', Object.assign({ sh: 1, dev: 'THERMO-METER PANEL', lab: 'LOWER GUIDE BEARING TEMP. HIGH 2ND' }, A_('lgb', '>', 75)));
+  jz('DI0183', Object.assign({ sh: 1, dev: 'THERMO-METER PANEL', lab: 'THRUST BEARING TEMP. HIGH 2ND' }, A_('thrust', '>', 75)));
+  jz('DI0039', { sh: 1, dev: 'ULCB', lab: 'EMERGENCY STOP SWITCH', model: (u) => !!u.fx.manual_5e });
+  jz('SMP1', { sh: 1, dev: 'SMP-1', lab: 'EMERGENCY STOP SWITCH', soe: '6DI0401' });
+  // ---------- SH.002 ----------
+  jz('6DI0153', { sh: 2, dev: 'PCPP', lab: 'POWER CABLE DIFFERENTIAL' });
+  jz('6DI0154', { sh: 2, dev: 'PCPP', lab: 'POWER CABLE OVER CURRENT' });
+  jz('6DI0140', { sh: 2, dev: 'PCPP', lab: 'BUS PROTECTION OPERATE' });
+  jz('DI0257', { sh: 2, dev: 'MTPP', lab: 'M.TR DIFFERENTIAL', model: (u) => !!u.fx.mtr_87t });
+  jz('DI0258', { sh: 2, dev: 'MTPP', lab: 'POWER CABLE DIFFERENTIAL' });
+  jz('DI0265', { sh: 2, dev: 'MTPP', lab: 'M.TR BUCHHOLZ TRIP', model: (u) => !!u.fx.mtr_buchholz && u.p.bh > 60 });
+  jz('DI0268', Object.assign({ sh: 2, dev: 'MTPP', lab: 'M.TR OIL TEMPERATURE TRIP' }, A_('mtrOil', '>', 95)));
+  jz('DI0270', Object.assign({ sh: 2, dev: 'MTPP', lab: 'M.TR WINDING TEMPERATURE TRIP' }, A_('mtrWdg', '>', 115)));
+  jz('DI0259', { sh: 2, dev: 'MTPP', lab: 'M.TR OVER CURRENT' });
+  jz('DI0260', { sh: 2, dev: 'MTPP', lab: 'M.TR NEUTRAL OVER CURRENT' });
+  jz('4DI0093', { sh: 2, dev: '452-*', lab: 'USTr GROUND OVER CURRENT' });
+  jz('UOCHV', { sh: 2, dev: '452-*', lab: 'USTr OVER CURRENT (HV)', soe: '4DI0092' });
+  jz('UOCLV', { sh: 2, dev: '452-*', lab: 'USTr OVER CURRENT (LV)', soe: '4DI0092' });
+  jz('DI0129', { sh: 2, dev: 'REG', lab: 'GOVERNOR FAULT', model: (u) => !!u.fx.gov_fault && (u.p.govOn || u.p.speed > 0.3) });
+  jz('DI0130', { sh: 2, dev: 'REG', lab: 'OVER SPEED (ELECTRICAL)', model: (u) => u.p.speed > 1.40 });
+  jz('DI0217', { sh: 2, dev: 'TCC', lab: 'OVER SPEED (MECHANICAL)', model: (u) => { if (u.p.speed > 1.45) u.p.mon.pendulum = true; return !!u.p.mon.pendulum; } });
+  jz('DI0152', Object.assign({ sh: 2, dev: 'TCC', lab: 'GOV. SUMP TANK OIL TEMPERATURE HIGH 2ND' }, A_('sumpT', '>', 65)));
+  jz('DI0155', Object.assign({ sh: 2, dev: 'TCC', lab: 'GOV. SUMP TANK OIL PRESSURE LOW 2ND' }, A_('govP', '<', 75, 1)));
+  jz('DI0212', Object.assign({ sh: 2, dev: 'TCC', lab: 'TURBINE GUIDE BEARING OIL LEVEL LOW 2ND' }, A_('tgbOil', '<', 60)));
+  jz('DI0226', { sh: 2, dev: 'TCC', lab: 'I/V SUMP TANK OIL TEMPERATURE HIGH 2ND' });
+  jz('DI0229P', { sh: 2, dev: 'TCC', lab: 'I/V SUMP TANK OIL PRESSURE LOW 2ND', soe: 'DI0229' });
+  jz('DI0204', Object.assign({ sh: 2, dev: 'TCC', lab: 'GOV. PRESSURE TANK OIL LEVEL LOW 2ND' }, A_('govLvl', '<', 75)));
+  jz('DI0222', { sh: 2, dev: 'TCC', lab: 'I/V PRESSURE TANK OIL LEVEL LOW 2ND' });
+  jz('TCCES', { sh: 2, dev: 'TCC', lab: 'EMERGENCY STOP SWITCH', soe: '—' });
+  jz('DI0157', { sh: 2, dev: 'ACT', lab: 'GOV. SUMP TANK OIL LEVEL LOW 2ND' });
+  jz('DI0229L', { sh: 2, dev: 'IVACT', lab: 'I/V SUMP TANK OIL LEVEL LOW 2ND', soe: 'DI0229' });
+  // ---------- SH.003 (86-5, software LCU) ----------
+  jz('DI0097', Object.assign({ sh: 3, dev: 'GTB', lab: 'THRUST BEARING TEMP. HIGH 1ST' }, A_('thrust', '>', 70)));
+  jz('DI0098', Object.assign({ sh: 3, dev: 'GTB', lab: 'UPPER GUIDE BEARING TEMP. HIGH 1ST' }, A_('ugb', '>', 70)));
+  jz('DI0099', Object.assign({ sh: 3, dev: 'GTB', lab: 'LOWER GUIDE BEARING TEMP. HIGH 1ST' }, A_('lgb', '>', 70)));
+  jz('DI0100', { sh: 3, dev: 'GTB', lab: 'UPPER GUIDE BEARING OIL LEVEL LOW' });
+  jz('DI0101', { sh: 3, dev: 'GTB', lab: 'LOWER GUIDE BEARING OIL LEVEL LOW', model: (u) => !!u.fx.brg_oil_low });
+  jz('DI0184', Object.assign({ sh: 3, dev: 'PRB', lab: 'AIR COOLER OUTLET TEMP. HIGH' }, A_('acOut', '>', 45)));
+  jz('DI0185', Object.assign({ sh: 3, dev: 'PRB', lab: 'AIR COOLER INLET TEMP. HIGH' }, A_('acIn', '>', 65)));
+  [['DI0187', 'ubv', 'VIBRATION TRIP (UPPER BRACKET) - (V)', 150], ['DI0189', 'ubh', 'VIBRATION TRIP (UPPER BRACKET) - (H)', 150], ['DI0191', 'lbv', 'VIBRATION TRIP (LOWER BRACKET) - (V)', 150],
+    ['DI0193', 'lbh', 'VIBRATION TRIP (LOWER BRACKET) - (H)', 150], ['DI0195', 'hcv', 'VIBRATION TRIP (HEAD COVER) - (V)', 7], ['DI0197', 'hch', 'VIBRATION TRIP (HEAD COVER) - (H)', 7],
+    ['DI0322', 'ugx', 'SHAFT RUN-OUT TRIP (UPPER SHAFT) - (X)', 200], ['DI0324', 'ugy', 'SHAFT RUN-OUT TRIP (UPPER SHAFT) - (Y)', 200], ['DI0326', 'lgx', 'SHAFT RUN-OUT TRIP (LOWER SHAFT) - (X)', 200],
+    ['DI0328', 'lgy', 'SHAFT RUN-OUT TRIP (LOWER SHAFT) - (Y)', 200], ['DI0330', 'tgx', 'SHAFT RUN-OUT TRIP (TURBINE SHAFT) - (X)', 200], ['DI0332', 'tgy', 'SHAFT RUN-OUT TRIP (TURBINE SHAFT) - (Y)', 200]]
+    .forEach(([id, k, lab, lim]) => jz(id, Object.assign({ sh: 3, dev: 'VMC', lab }, A_(k, '>', lim))));
+  jz('DI0159', Object.assign({ sh: 3, dev: 'ACT', lab: 'GOV. OIL SYSTEM PRESSURE LOW 1ST' }, A_('govP', '<', 85, 2)));
+  jz('DI0225', { sh: 3, dev: 'IVACT', lab: 'I/V PRESSURE TANK OIL TEMP. HIGH 1ST' });
+  jz('DI0151', Object.assign({ sh: 3, dev: 'TCC', lab: 'GOV. SUMP TANK OIL TEMPERATURE HIGH 1ST' }, A_('sumpT', '>', 60)));
+  jz('DI0154', { sh: 3, dev: 'TCC', lab: 'GOV. SUMP TANK OIL LEVEL LOW 1ST' });
+  jz('DI0203', Object.assign({ sh: 3, dev: 'TCC', lab: 'GOV. PRESSURE TANK OIL LEVEL LOW 1ST' }, A_('govLvl', '<', 85)));
+  jz('DI0211', Object.assign({ sh: 3, dev: 'TCC', lab: 'TURBINE GUIDE BEARING TEMP. HIGH 1ST' }, A_('tgb', '>', 70)));
+  jz('DI0213', Object.assign({ sh: 3, dev: 'TCC', lab: 'TURBINE GUIDE BEARING OIL LEVEL LOW' }, A_('tgbOil', '<', 80)));
+  jz('DI0231', { sh: 3, dev: 'TCC', lab: 'I/V OIL SYSTEM PRESSURE LOW 1ST' });
+  jz('DI0236', Object.assign({ sh: 3, dev: 'TCC', lab: 'TURBINE BEARING WATER FLOW LOW' }, A_('f_tb', '<', 40)));
+  jz('DI0240', Object.assign({ sh: 3, dev: 'TCC', lab: 'SHAFT SEAL COOLING WATER FLOW LOW' }, A_('f_sc', '<', 40)));
+  jz('DI0289', { sh: 3, dev: 'MCC*A/B', lab: 'MAIN COOLING WATER PUMP - A START', model: (u) => u.p.cw[0].run });
+  jz('DI0301', { sh: 3, dev: 'MCC*A/B', lab: 'MAIN COOLING WATER PUMP - B START', model: (u) => u.p.cw[1].run });
+  jz('DI0143', { sh: 3, dev: 'REG', lab: 'UNIT COMPLETELY STOP (14L)', model: (u) => u.p.speed < 0.005 });
+  jz('DI0142', { sh: 3, dev: 'REG', lab: 'TURBINE SPEED > 90%', model: (u) => u.p.speed > 0.9 });
+  jz('RTUI', Object.assign({ sh: 3, dev: 'RTU-I (INTAKE)', lab: 'INTAKE WATER LEVEL < 577.51 Elm', soe: 'RTU-I' }, A_('intake', '<', 577.51, 5)));
+  JZ.DI0123.sh3 = true;   // 64E muncul di SH.001 (SOE) dan SH.003 (PRB → 86-5)
+
   class Unit {
     constructor(n, plant) {
       this.n = n; this.plant = plant;
@@ -201,6 +313,7 @@
       this.ctrl = { cb52Remote: true, excRemote: true, voltAuto: true, govRemote: true };
       this.lo = { '86-1': null, '86-2': null, '86-4': null, '86-5': null, '86-T': null, '86-PC': null };   // lockout relay (penyebab)
       this.fx = {};                                      // gangguan aktif
+      this.jf = {}; this.ja = {}; this.jtgt = {}; this.jin = {}; this.jg = {};   // JEZ2K031: input dipaksa, analog dimanipulasi, target relai
       this.do = {};                                      // perintah DO terakhir (indikasi)
       this.p = this.coldState();
       this.alm = {};
@@ -254,8 +367,8 @@
     s14L() { return this.p.speed < 0.005; }
     s14LT() { return this.s14L() && this.p.zeroT >= 20; }
     s14_2() { return this.p.speed < 0.2; }
-    tgbOilLvl() { return this.fx.tgb_oil_low ? 1 - this.fx.tgb_oil_low.v : 1; }
-    govSumpT() { return 45 + (this.fx.gov_sump_temp ? this.fx.gov_sump_temp.v : 0); }
+    tgbOilLvl() { if (this.ja.tgbOil) return this.ja.tgbOil.v / 100; return this.fx.tgb_oil_low ? 1 - this.fx.tgb_oil_low.v : 1; }
+    govSumpT() { if (this.ja.sumpT) return this.ja.sumpT.v; return 45 + (this.fx.gov_sump_temp ? this.fx.gov_sump_temp.v : 0); }
     s74mb() { return this.p.gv <= GV_NL + 2; }
     gridOK() { return this.plant.sy.unitOnGrid(this.n); }
     anyLO() { return Object.values(this.lo).some(Boolean); }
@@ -566,14 +679,18 @@
       }
     }
     retargetForce() { this.tr = null; this.dir = this.target > this.pos ? 1 : this.target < this.pos ? -1 : 0; if (this.dir) { this.lastDir = this.dir; this.beginTransition(); } }
-    reset86(k) {
+    reset86(k) {   // JEZ2K031: R = RESET PB AND NOT(input SET); 86-5: R = 14L (DI0143) AND 86-5 RESET face plate
       if (!this.lo[k]) return;
-      if ((k === '86-5' || k === '86-1' || k === '86-2' || k === '86-T' || k === '86-PC') && !this.s14LT()) { this.log('INFO', `${k} RESET ditolak: unit belum stand still (14LT)`); return; }
-      if (k === '86-4' && this.p.cb) { this.log('INFO', '86-4 RESET ditolak: 52 masih tertutup'); return; }
-      if (this.protActive(k)) { const wl = /INTAKE/.test(this.lo[k]) ? ` – level sekarang El. ${this.plant.intakeWL.toFixed(2)} m, perlu > 577.51 m` : ''; this.log('INFO', `${k} RESET ditolak: penyebab masih ada (${this.lo[k]})${wl}`); return; }
+      if (k === '86-5' && !this.jzSig('DI0143')) { this.log('INFO', '86-5 RESET ditolak: UNIT COMPLETELY STOP 14L (DI0143) belum ON'); return; }
+      if ((k === '86-T' || k === '86-PC') && !this.s14LT()) { this.log('INFO', `${k} RESET ditolak: unit belum stand still (14LT)`); return; }
+      if (this.protActive(k)) {
+        const ids = Object.keys(this.jin || {}).filter((x) => this.jin[x] && JZ[x] && JZ[x].sh && !/^DI0(289|301|142|143)$/.test(x));
+        const wl = /INTAKE/.test(this.lo[k]) ? ` – level sekarang El. ${this.plant.intakeWL.toFixed(2)} m, perlu > 577.51 m` : '';
+        this.log('INFO', `${k} RESET ditolak: input SET masih aktif (${ids.map((x) => JZ[x].soe + ' ' + JZ[x].lab).join('; ') || this.lo[k]})${wl}`); return;
+      }
       this.log('CMD', `${k} RESET`); this.lo[k] = null;
-      if (k === '86-1' || k === '86-2') this.p.mon.pendulum = false;
     }
+    pendulumReset() { if (this.p.speed < 1.05) { this.p.mon.pendulum = false; this.log('CMD', 'RESET PENDULUM OVERSPEED MEKANIK 33-12M (lokal)'); } else this.log('INFO', 'Reset pendulum ditolak: putaran masih tinggi'); }
     protActive(k) { return (this.p.mon.active || {})[k] || false; }
 
     /* ======================= OPERATOR LAIN ======================= */
@@ -798,74 +915,98 @@
       if (F.mtr_buchholz) p.bh += dt;
     }
 
-    /* ======================= PROTEKSI ======================= */
-    protection(dt) {
-      const p = this.p, F = this.fx, m = p.mon;
-      const timed = (key, cond, delay) => { m[key] = cond ? (m[key] || 0) + dt : 0; return m[key] >= delay; };
-      const act = { '86-1': false, '86-2': false, '86-4': false, '86-5': false, '86-T': false, '86-PC': false };
-      const trip = (k, cause) => { act[k] = true; if (!this.lo[k]) this.operate86(k, cause); };
-      const running = p.speed > 0.3;
-      const s14L = p.speed < 0.005;                               // DI0143 UNIT COMPLETELY STOP (14L)
-      const s13_2 = p.speed > 0.9;                                // DI0142 TURBINE SPEED > 90 %
-      // JEZ2K031 SH.003: proteksi aliran air diaktifkan 30 s setelah pompa CW main A/B start, di-reset oleh 14L (reset dominan)
-      const cwRun = p.cw[0].run || p.cw[1].run;
-      m.cwT = cwRun ? (m.cwT || 0) + dt : 0;
-      if (s14L) m.cwArm = false; else if (m.cwT >= 30) m.cwArm = true;
-      // ================= 86-5 DAMAGE PREVENTIVE STOP (JEZ2K031 SH.003, software LCU) =================
-      if (p.T.thrust > 70) trip('86-5', 'THRUST BEARING TEMP. HIGH 1ST (DI0097)');
-      if (p.T.ugb > 70) trip('86-5', 'UPPER GUIDE BEARING TEMP. HIGH 1ST (DI0098)');
-      if (p.T.lgb > 70) trip('86-5', 'LOWER GUIDE BEARING TEMP. HIGH 1ST (DI0099)');
-      if (p.T.tgb > 70) trip('86-5', 'TURBINE GUIDE BEARING TEMP. HIGH 1ST (DI0211)');
-      if (F.brg_oil_low && s13_2) trip('86-5', 'LOWER GUIDE BEARING OIL LEVEL LOW (DI0101) AND n > 90 %');
-      if (F.gen_64e && p.fcb) trip('86-5', 'GENERATOR FIELD GROUND FAULT 64E (DI0123)');
-      if (Math.max(p.vib.tgx, p.vib.tgy) > 200) trip('86-5', 'SHAFT RUN-OUT TRIP (TURBINE SHAFT) (DI0330/0332)');
-      if (timed('gp1', p.govP < 0.85, 2)) trip('86-5', 'GOV. OIL SYSTEM PRESSURE LOW 1ST (DI0159)');
-      if (p.govLvl < 0.85) trip('86-5', 'GOV. PRESSURE TANK OIL LEVEL LOW 1ST (DI0203)');
-      if (this.govSumpT() > 60) trip('86-5', 'GOV. SUMP TANK OIL TEMPERATURE HIGH 1ST (DI0151)');
-      if (this.tgbOilLvl() < 0.8) trip('86-5', 'TURBINE GUIDE BEARING OIL LEVEL LOW (DI0213)');
-      if (timed('tbw', m.cwArm && p.f_tb < 0.4, 120)) trip('86-5', 'TURBINE BEARING WATER FLOW LOW (DI0236, 2 min)');
-      if (timed('ssw', m.cwArm && p.f_sc < 0.4, 120)) trip('86-5', 'SHAFT SEAL COOLING WATER FLOW LOW (DI0240, 2 min)');
-      if (timed('intake', this.plant.intakeWL < 577.51, 5)) trip('86-5', 'INTAKE WATER LEVEL < El.577.51 m (RTU-I)');
-      // ================= 86-2 QUICK STOP (SH.001 + SH.002 LOT-IIIA) =================
-      if (F.manual_5e) trip('86-2', 'EMERGENCY STOP SWITCH ULCB (DI0039)');
-      if (F.gen_fire) trip('86-2', 'GENERATOR FIRE (DI0314)');
-      if (p.T.thrust > 75) trip('86-2', 'THRUST BEARING TEMP. HIGH 2ND (DI0183)');
-      if (p.T.ugb > 75) trip('86-2', 'UPPER GUIDE BEARING TEMP. HIGH 2ND (DI0181)');
-      if (p.T.lgb > 75) trip('86-2', 'LOWER GUIDE BEARING TEMP. HIGH 2ND (DI0182)');
-      if (F.gov_fault && (p.govOn || running)) trip('86-2', 'GOVERNOR FAULT (DI0129)');
-      if (p.speed > 1.40) trip('86-2', 'OVER SPEED (ELECTRICAL) (DI0130)');
-      if (p.speed > 1.45) { m.pendulum = true; trip('86-2', 'OVER SPEED (MECHANICAL) 33-12M (DI0217)'); }
-      if (timed('gp2', p.govP < 0.75, 1)) trip('86-2', 'GOV. SUMP TANK OIL PRESSURE LOW 2ND (DI0155)');
-      if (p.govLvl < 0.75) trip('86-2', 'GOV. PRESSURE TANK OIL LEVEL LOW 2ND (DI0204)');
-      if (this.govSumpT() > 65) trip('86-2', 'GOV. SUMP TANK OIL TEMPERATURE HIGH 2ND (DI0152)');
-      if (this.tgbOilLvl() < 0.6) trip('86-2', 'TURBINE GUIDE BEARING OIL LEVEL LOW 2ND (DI0212)');
-      // ================= 86-1 EMERGENCY STOP (SH.001 + SH.002 LOT-IIIC) =================
-      if (F.gen_87 && p.vt > 0.3) trip('86-1', 'GENERATOR DIFFERENTIAL 87 (DI0116)');
-      if (F.gen_40 && p.cb && timed('g40', p.q < -0.35 * PR, 1)) trip('86-1', 'GENERATOR LOSS OF FIELD 40 (DI0124)');
-      if (F.gen_46 && p.cb && timed('g46', true, 1)) trip('86-1', 'NEGATIVE SEQUENCE OVERCURRENT 46 (DI0125)');
-      if (F.exc_51e && p.fcb) trip('86-1', 'OVERCURRENT RELAY FOR EXCITATION CIRCUIT 51E (DI0126)');
-      if (F.exc_heavy && p.excOn) trip('86-1', 'EXCITATION SYSTEM HEAVY FAULT (DI0082)');
-      // ================= 86-4 NO-LOAD & EXCITATION (SH.001: 51, 59, 27) =================
-      if (F.gen_51 && p.cb && timed('g51', true, 1.5)) trip('86-4', 'GENERATOR OVER CURRENT 51 (DI0118)');
-      if (timed('g59', p.vt > 1.12, 2)) trip('86-4', 'GENERATOR OVERVOLTAGE 59 (DI0121)');
-      if (F.gen_27 && p.cb && this.sw.s43CH !== 'USE' && timed('g27', true, 3)) trip('86-4', 'GENERATOR UNDERVOLTAGE 27 (DI0122)');
-      // ================= 86-T (LOT-IIIC, ditambah 86-1) =================
-      if (F.mtr_87t) trip('86-T', 'M.TR DIFFERENTIAL (DI0257)');
-      if (F.mtr_buchholz && p.bh > 60) trip('86-T', 'M.TR BUCHHOLZ TRIP (DI0265)');
-      // ================= OUTPUT HARDWIRED (SH.001) =================
-      // 52 TRIP = 86-1 OR 86-4 OR (86-2 AND GUIDE VANE NO-LOAD OPENING)
-      if (p.cb && this.lo['86-2'] && this.s74mb()) this.openCB('86-2 AND GUIDE VANE NO-LOAD OPENING (74mb)');
-      // 41 TRIP = (86-1 OR 86-2) AND 52 OPEN
-      if (!p.cb && (this.lo['86-1'] || this.lo['86-2']) && (p.excOn || p.fcb)) {
-        p.excOn = false; p.sync = false; this.log('ALARM', `${this.n}: FIELD CIRCUIT BREAKER (41) TRIP – ${this.lo['86-1'] ? '86-1' : '86-2'} AND 52 OPEN`);
+    /* ======================= PROTEKSI – LOGIKA JEZ2K031 ======================= */
+    // nilai input: paksa instruktur (jf: 'on' | 'off') atau model plant
+    jzSig(id) { return !!(this.jin || {})[id]; }
+    jzApply(dt) {   // nilai analog yang diubah instruktur: bergerak dengan laju tertentu menuju target, menimpa model
+      for (const [k, o] of Object.entries(this.ja)) {
+        const a = ANA[k]; if (a.plant) continue;
+        if (o.v === undefined) o.v = a.get(this);
+        o.v = rate(o.v, o.tgt, (o.rate || a.rate) / 60, dt);
+        a.set(this, o.v);
       }
-      m.active = act;
-      // alarm sekuens error dihapus bila transisi berjalan ulang
+    }
+    protection(dt) {
+      const p = this.p, m = p.mon, sw = this.sw;
+      const T = (key, cond, delay) => { m[key] = cond ? (m[key] || 0) + dt : 0; return m[key] >= delay; };
+      const prev = this.jin || {}, jin = {};
+      for (const d of Object.values(JZ)) {
+        const f = this.jf[d.id];
+        const v = f === 'on' ? true : f === 'off' ? false : !!d.model(this, T);
+        jin[d.id] = v;
+        if (v && !prev[d.id] && this.jinInit) this.log('ALARM', `SOE ${d.soe} ${d.lab}${d.code ? ' (' + d.code + ')' : ''} ON${f ? ' – instruktur' : ''}`);
+      }
+      this.jin = jin; this.jinInit = true;
+      const S = (id) => jin[id], OR = (...a) => a.some(Boolean), AND = (...a) => a.every(Boolean);
+      const g = {};
+      // ---------- SH.001 – UPRB M3425A-1/-2 (blok A = 52 OPEN, B = LINE CHARGE MODE USE) ----------
+      g.A = !p.cb; g.B = sw.s43CH === 'USE'; g.GVNL = this.s74mb();
+      g.and64VS = AND(S('DI0117'), !g.A); g.and51 = AND(S('DI0118'), !g.A); g.and40 = AND(S('DI0124'), !g.A); g.and27 = AND(S('DI0122'), !g.A, !g.B);
+      g.or1 = OR(S('DI0119'), g.and64VS, S('DI0116')); g.alm1 = OR(S('M1PS'), S('M1ST'));
+      g.or2 = OR(S('DI0125'), g.and40); g.or3 = OR(S('DI0121'), g.and27); g.alm2 = OR(S('M2PS'), S('M2ST'));
+      // ---------- SH.002 – 86-1 (LOT-IIIC) & 86-2 (LOT-IIIA) ----------
+      g.pcpp = OR(S('6DI0153'), S('6DI0154'), S('6DI0140'));
+      g.ustOC = OR(S('UOCHV'), S('UOCLV')); g.ust = OR(S('DI0120'), S('4DI0093'), g.ustOC);
+      g.mtr = OR(S('DI0257'), S('DI0258'), S('DI0265'), S('DI0268'), S('DI0270'), S('DI0259'), S('DI0260'));
+      g.mtpp = OR(g.mtr, g.ust); g.lot3c = OR(g.pcpp, g.mtpp);
+      g.reg = OR(S('DI0129'), S('DI0130'));
+      g.tcc = OR(S('DI0217'), S('DI0152'), S('DI0155'), S('DI0212'), S('DI0226'), S('DI0229P'), S('DI0204'), S('DI0222'), S('TCCES'));
+      g.lot3a = OR(g.reg, g.tcc, S('DI0157'), S('DI0229L'));
+      // ---------- SET lockout relay (SH.001) ----------
+      g.set1 = OR(g.or1, g.alm1, g.or2, g.alm2, S('DI0126'), S('DI0082'), g.lot3c);
+      g.set2 = OR(g.lot3a, S('DI0314'), S('DI0181'), S('DI0182'), S('DI0183'), S('DI0039'), S('SMP1'));
+      g.set4 = OR(g.and51, g.or3);
+      // ---------- SH.003 – 86-5 DAMAGE PREVENTIVE STOP (software LCU) ----------
+      g.and100 = AND(S('DI0100'), S('DI0142')); g.and101 = AND(S('DI0101'), S('DI0142'));
+      g.ton236 = T('t236', S('DI0236'), 120); g.ton240 = T('t240', S('DI0240'), 120);
+      g.cwStart = OR(S('DI0289'), S('DI0301')); g.ton30 = T('t30', g.cwStart, 30);
+      if (S('DI0143')) m.cwArm = false; else if (g.ton30) m.cwArm = true;     // latch: reset (14L) dominan
+      g.arm = !!m.cwArm; g.and236 = AND(g.ton236, g.arm); g.and240 = AND(g.ton240, g.arm);
+      const L5 = ['DI0097', 'DI0098', 'DI0099', 'DI0123', 'DI0184', 'DI0185', 'DI0187', 'DI0189', 'DI0191', 'DI0193', 'DI0195', 'DI0197', 'DI0322', 'DI0324', 'DI0326', 'DI0328', 'DI0330', 'DI0332',
+        'DI0159', 'DI0225', 'DI0151', 'DI0154', 'DI0203', 'DI0211', 'DI0213', 'DI0231', 'RTUI'];
+      g.set5 = OR(...L5.map(S), g.and100, g.and101, g.and236, g.and240);
+      // ---------- operate lockout relay ----------
+      const cause = (ids) => { const d = ids.find((x) => S(x)); return d ? `${JZ[d].lab}${JZ[d].code ? ' ' + JZ[d].code : ''} (${JZ[d].soe})` : null; };
+      const op = (k, c) => { if (!this.lo[k]) this.operate86(k, c); };
+      if (g.set1) {
+        if (g.mtpp && !this.lo['86-T']) op('86-T', cause(['DI0257', 'DI0258', 'DI0265', 'DI0268', 'DI0270', 'DI0259', 'DI0260', 'DI0120', '4DI0093', 'UOCHV', 'UOCLV']));
+        else if (g.pcpp && !this.lo['86-PC']) op('86-PC', cause(['6DI0153', '6DI0154', '6DI0140']));
+        op('86-1', cause(['DI0119', 'DI0117', 'DI0116', 'M1PS', 'M1ST', 'DI0125', 'DI0124', 'M2PS', 'M2ST', 'DI0126', 'DI0082']) || (g.lot3c ? 'SH.002 LOT-IIIC (86-T etc.)' : '86-1'));
+      }
+      if (g.set2) op('86-2', cause(['DI0314', 'DI0181', 'DI0182', 'DI0183', 'DI0039', 'SMP1', 'DI0129', 'DI0130', 'DI0217', 'DI0152', 'DI0155', 'DI0212', 'DI0226', 'DI0229P', 'DI0204', 'DI0222', 'TCCES', 'DI0157', 'DI0229L']));
+      if (g.set4) op('86-4', cause(g.and51 ? ['DI0118'] : ['DI0121', 'DI0122']));
+      if (g.set5) op('86-5', cause(L5) || (g.and100 ? 'UPPER GUIDE BEARING OIL LEVEL LOW AND n > 90 %' : g.and101 ? 'LOWER GUIDE BEARING OIL LEVEL LOW AND n > 90 %' : g.and236 ? 'TURBINE BEARING WATER FLOW LOW 2 min' : 'SHAFT SEAL COOLING WATER FLOW LOW 2 min'));
+      // ---------- OUTPUT (SH.001) ----------
+      const lo1 = !!this.lo['86-1'], lo2 = !!this.lo['86-2'], lo4 = !!this.lo['86-4'];
+      g.and52 = AND(g.GVNL, lo2); g.trip52 = OR(lo1, g.and52, lo4);
+      if (p.cb && g.and52) this.openCB('86-2 AND GUIDE VANE NO-LOAD OPENING (74mb)');
+      g.or12 = OR(lo1, lo2); g.trip41 = AND(g.or12, g.A);
+      if (g.trip41 && (p.excOn || p.fcb)) { p.excOn = false; p.sync = false; this.log('ALARM', `${this.n}: FIELD CIRCUIT BREAKER (41) TRIP – ${lo1 ? '86-1' : '86-2'} AND 52 OPEN`); }
+      g.tqs = g.or12; g.ivqs = g.or12;
+      // target indikator relai M3425A (latch L, di-reset RESET PB relai)
+      for (const id of ['DI0119', 'DI0117', 'DI0116', 'DI0118', 'DI0120', 'DI0125', 'DI0124', 'DI0121', 'DI0122', 'DI0123']) if (S(id)) this.jtgt[id] = true;
+      g.lo = { '86-1': lo1, '86-2': lo2, '86-4': lo4, '86-5': !!this.lo['86-5'] };
+      this.jg = g;
+      m.active = { '86-1': g.set1, '86-2': g.set2, '86-4': g.set4, '86-5': g.set5, '86-T': g.mtpp, '86-PC': g.pcpp };
       if (!this.tr || !this.tr.fail) m.seqErr = null;
     }
+    jzForce(id, mode) {   // mode: 'on' | 'off' | null (kembali ke model)
+      const d = JZ[id]; if (!d) return;
+      if (mode) this.jf[id] = mode; else delete this.jf[id];
+      this.log('CMD', `INSTRUKTUR: input ${d.soe} ${d.lab} → ${mode ? 'PAKSA ' + mode.toUpperCase() : 'NORMAL (model)'}`);
+    }
+    jzAnalog(key, tgt, rt) {   // tgt null = lepas (kembali ke model)
+      const a = ANA[key];
+      if (tgt === null || tgt === undefined) { delete this.ja[key]; if (a.plant) delete this.plant.ja[key]; this.log('CMD', `INSTRUKTUR: ${a.name} kembali ke model`); return; }
+      const o = { tgt: +tgt, rate: rt || a.rate, v: a.get(this) };
+      if (a.plant) this.plant.ja[key] = o; else this.ja[key] = o;
+      this.log('CMD', `INSTRUKTUR: ${a.name} → ${tgt} ${a.unit} (laju ${o.rate} ${a.unit}/menit)`);
+    }
+    jzClear() { this.jf = {}; for (const k of Object.keys(this.ja)) delete this.ja[k]; if (this.plant.ja) for (const k of Object.keys(this.plant.ja)) delete this.plant.ja[k]; }
+    targetReset(dev) { for (const id of Object.keys(this.jtgt)) if (JZ[id].dev === dev && !this.jzSig(id)) delete this.jtgt[id]; this.log('CMD', `${dev} RESET PB (target relai)`); }
 
     /* ======================= TICK ======================= */
-    tick(dt) { this.sequence(dt); this.physics(dt); this.protection(dt); }
+    tick(dt) { const fr = this.plant.frc; this.sequence(dt); if (fr) fr.unitDO(this); this.physics(dt); this.jzApply(dt); if (fr) fr.unitAO(this); this.protection(dt); }
 
     /* ======================= ANALOG / OUTPUT ======================= */
     meas() {
@@ -1009,7 +1150,7 @@
       this.units = [1, 2, 3].map(n => new Unit(n, this));
       this.sy = new Switchyard(this);
       this.intakeWL = 578.60; this.inflow = 14.6; this.cwIn = 27.3; this.refill = false;
-      this.fx = {}; this.spillQ = 0;
+      this.fx = {}; this.spillQ = 0; this.ja = {};
       EXT.forEach(e => e.build && e.build(this));
       this.alarms = new AlarmSystem(this);
     }
@@ -1077,7 +1218,7 @@
       }
     }
     activeFault(key, n) { return SCN[key].unit ? !!this.units[n - 1].fx[key] : !!this.fx[key]; }
-    clearAllFaults() { if (this.fx.intake_low && this.intakeWL < 577.80) this.refill = true; this.units.forEach(u => u.fx = {}); this.fx = {}; this.sy.busFault = { A: false, B: false }; this.sy.lineOK = { L1: true, L2: true }; EXT.forEach(e => e.clear && e.clear(this)); this.log('INFO', 'Semua gangguan dihapus'); }
+    clearAllFaults() { if (this.fx.intake_low && this.intakeWL < 577.80) this.refill = true; this.units.forEach(u => { u.fx = {}; u.jzClear(); u.jtgt = {}; u.p.mon.pendulum = false; }); this.fx = {}; this.sy.busFault = { A: false, B: false }; this.sy.lineOK = { L1: true, L2: true }; EXT.forEach(e => e.clear && e.clear(this)); this.log('INFO', 'Semua gangguan dihapus'); }
 
     tick(dt) {
       dt = clamp(+dt || 0, 0, 60);
@@ -1098,6 +1239,7 @@
         // invers kurva volume (newton 2 iterasi)
         let x = this.intakeWL; for (let k = 0; k < 2; k++) { const fx = volIntake(x) - V, d = (2 * 189.475 * x - 218232.925) * 1000; x -= fx / d; }
         this.intakeWL = clamp(x, 574.0, 581.0);
+        for (const [k, o] of Object.entries(this.ja)) { if (o.v === undefined) o.v = this.intakeWL; o.v = rate(o.v, o.tgt, o.rate / 60, st); if (k === 'intake') this.intakeWL = o.v; }
         for (const e of EXT) if (e.tick) e.tick(this, st);
         this.alarms.tick(st);
       }
@@ -1192,9 +1334,12 @@
 
   class AlarmSystem {
     constructor(plant) {
-      this.plant = plant; this.pt = {}; this.seq = 500; this.list = [];
+      this.plant = plant; this.pt = {}; this.seq = 500; this.list = []; this.force = {};
       this.defs = [];
-      plant.units.forEach(u => UNIT_POINTS.forEach(d => this.defs.push({ grp: 'U' + u.n, win: d[0], tag: `${u.n}${d[1]}`, text: d[2], lvl: d[3], cond: () => d[4](u), delay: d[5] || 0 })));
+      const have = new Set(UNIT_POINTS.map((d) => d[1]));
+      const WIN = { 'M3425A-1': 'B1', 'M3425A-2': 'B1', UPRB: 'B3', AVR: 'B3', 'CO2 F.F': 'B8', 'THERMO-METER PANEL': 'C4', ULCB: 'A8', 'SMP-1': 'A8', PCPP: 'A7', MTPP: 'A6', '452-*': 'A6', REG: 'B4', TCC: 'D2', ACT: 'D2', IVACT: 'B5', GTB: 'C2', PRB: 'C6', VMC: 'E1', 'RTU-I (INTAKE)': 'A5' };
+      const extra = Object.values(JZ).filter((d) => WIN[d.dev] && !have.has(d.soe) && !/^DI0(289|301|142|143)$/.test(d.id)).map((d) => [WIN[d.dev], d.soe, d.lab + (d.code ? ` (${d.code})` : ''), d.sh === 3 ? 'L' : 'H', (u) => u.jzSig(d.id)]);
+      plant.units.forEach(u => UNIT_POINTS.concat(extra).forEach(d => this.defs.push({ grp: 'U' + u.n, win: d[0], tag: `${u.n}${d[1]}`, text: d[2], lvl: d[3], cond: JZ[d[1]] ? () => u.jzSig(d[1]) || d[4](u) : () => d[4](u), delay: d[5] || 0 })));
       SY_POINTS.forEach(d => this.defs.push({ grp: 'SY', win: d[0], tag: d[1], text: d[2], lvl: d[3], cond: () => d[4](plant), delay: d[5] || 0 }));
       EXT.forEach(e => e.points && e.points(plant).forEach(d => this.defs.push(Object.assign({ delay: 0 }, d))));
       this.defs.forEach((d, i) => { d.i = i; this.pt[i] = { on: false, tOn: 0, ack: true, id: null }; });
@@ -1202,7 +1347,7 @@
     tick(dt) {
       for (const d of this.defs) {
         const s = this.pt[d.i]; let c = false;
-        try { c = !!d.cond(); } catch (e) { c = false; }
+        try { c = this.force && d.tag in this.force ? this.force[d.tag] : !!d.cond(); } catch (e) { c = false; }
         s.tOn = c ? s.tOn + dt : 0;
         const on = c && s.tOn >= d.delay;
         if (on && !s.on) {
@@ -1264,8 +1409,8 @@
     ['T/L line protection', '152-L1/L2', '—', 'instan', '— (CB saluran)', '152-L trip, auto-reclose 1 s bila USE', 'selector: data · waktu: asumsi'],
     ['Bus bar protection', 'bus A/B', '—', 'instan', '— (CB bus)', 'semua CB pada bus trip', 'selector: data · aksi: asumsi'],
   ];
-  const RESET_RULE = { '86-1': 'RESET PB 3-86-1 (OPS) – penyebab hilang & stand still (14LT)', '86-2': 'RESET PB 3-86-2 (OPS) – penyebab hilang & stand still (14LT)', '86-T': 'stand still & penyebab hilang', '86-PC': 'stand still & penyebab hilang', '86-4': 'RESET PB 3-86-4 (OPS/ULCB) – 52 OPEN & penyebab hilang', '86-5': '86-5 RESET face plate OPS – 14L ON & penyebab hilang' };
+  const RESET_RULE = { '86-1': 'RESET PB 3-86-1 (OPS) AND NOT input SET (JEZ2K031 SH.001)', '86-2': 'RESET PB 3-86-2 (OPS) AND NOT input SET (JEZ2K031 SH.001)', '86-T': 'stand still & penyebab hilang', '86-PC': 'stand still & penyebab hilang', '86-4': 'RESET PB 3-86-4 (OPS atau ULCB) AND NOT input SET (SH.001)', '86-5': '86-5 RESET FACE PLATE (OPS) AND 14L DI0143 (SH.003)' };
 
-  const API = { EXT, clamp, lag, rate, PROT_TABLE, RESET_RULE, Plant, Unit, Switchyard, STEP, START_T, STOP_T, SCENARIOS, SCN, UNIT_WIN, SY_WIN, PR, RPM, GV_MW, GV_NL, interp };
+  const API = { JZ, ANA, EXT, clamp, lag, rate, PROT_TABLE, RESET_RULE, Plant, Unit, Switchyard, STEP, START_T, STOP_T, SCENARIOS, SCN, UNIT_WIN, SY_WIN, PR, RPM, GV_MW, GV_NL, interp };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.MUSI = API;
 })(typeof window !== 'undefined' ? window : globalThis);
