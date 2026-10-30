@@ -409,6 +409,8 @@
       this.rwl = 154.0; this.rg = 0.4; this.rgSet = 0.4; this.sl = [0, 0]; this.rMode = 'AUTO'; this.rQn = 3.0;
       this.Top = 6; this.QA = 0; this.plannedRWL = 155.0; this.RFSL = 157.5; this.flood = false; this.floodT = 0; this.floodHold = 0; this.rT = 0;
       this.qo = 0; this.qr = 0; this.rOut = 0; this.rIn = 0; this.rHist = [];
+      // peralatan lain di layar 00022 (posisi saja – kurva debit tidak tersedia)
+      this.flap = [0, 0, 0]; this.flapSet = [0, 0, 0]; this.isl = [0, 0]; this.usg = [0, 0]; this.lsg = [0, 0]; this.ig = [1, 1]; this.rake = false;
     }
     powered(site) { const ss = this.plant.ss; return !ss || !!ss.live[site === 'ID' ? 'IDLINE' : 'RDLINE']; }
     gateKW(site) { return site === 'ID' ? (this.sg.some((a, i) => Math.abs(a - this.sgSet[i]) > 0.01) ? 15 : 0) : (Math.abs(this.rg - this.rgSet) > 0.01 ? 7.5 : 0); }
@@ -421,7 +423,7 @@
       const pl = this.plant;
       // ---------------- intake dam ----------------
       const pw = this.powered('ID');
-      for (let i = 0; i < 3; i++) if (pw) this.sg[i] = rate(this.sg[i], this.sgSet[i], 0.3 / 60, dt);   // gerak gate 0.3 m/menit (asumsi)
+      for (let i = 0; i < 3; i++) if (pw) { this.sg[i] = rate(this.sg[i], this.sgSet[i], 0.3 / 60, dt); this.flap[i] = rate(this.flap[i], this.flapSet[i], 10 / 60, dt); }   // gate 0.3 m/menit, flap 10 %/menit (asumsi)
       pl.spillQ = this.sg.reduce((a, x) => a + this.qSpill(x), 0);
       this.histT += dt;
       if (this.histT >= 300) {     // nilai 5 menit (SH.003)
@@ -529,9 +531,14 @@
 
   /* ============================== ANNUNCIATOR ==============================
      USS: JEZ1L693 SH.064 ; MSS: JEZ1L693 SH.110 */
+  NEW_SCN.push({ key: 'air_comp_fail', grp: 'STATION SERVICE', name: 'Air compressor 1 unit No.1 gagal + kebocoran primary air tank #1', unit: false,
+    cause: 'Motor kompresor trip dan ada kebocoran pada pipa udara primary air tank #1.',
+    chain: 'Tekanan primary air tank #1 turun → 63AQH1 OFF (alarm PRIMARY AIR TANK PRESSURE LOW) → suplai udara ke governor pressure tank dan, lewat reducing valve, ke brake air tank berkurang → bila berlanjut 63AQL (BRAKE AIR TANK PRESSURE LOW).',
+    prot: 'Alarm 63AQH1 / 63AQL', src: 'layar AIR SUPPLY SYSTEM 00010 · laju tekanan ASUMSI', act: 'Pantau tekanan di AIR SUPPLY SYSTEM; buka valve interkoneksi (cross-tie) dari unit lain bila tersedia, perbaiki kompresor; hindari start/stop unit No.1 (pemakaian udara rem).' });
+  M.SCENARIOS.push(NEW_SCN[NEW_SCN.length - 1]); M.SCN.air_comp_fail = NEW_SCN[NEW_SCN.length - 1];
   const USS_WIN = {
     A: ['UNDERGROUND\nS/S CONTROL\nCPU\nHEAVY ERROR', '', '', '', '', '', '', ''],
-    B: ['SSTR. NO.1', 'SSTR. NO.2', 'USTR. NO.1', 'USTR. NO.2', 'USTR. NO.3', 'LOCAL\nCONTROL\nUNIT', '', 'WATER CHILLER'],
+    B: ['SSTR. NO.1', 'SSTR. NO.2', 'USTR. NO.1', 'USTR. NO.2', 'USTR. NO.3', 'LOCAL\nCONTROL\nUNIT', 'AIR SUPPLY\nSYSTEM', 'WATER CHILLER'],
     C: ['DRAINAGE\nPUMP', 'JET PUMP', 'LUBRICATING\nOIL PUMP', 'DRAINAGE\nWATER LEVEL', 'DC SYSTEM', 'AC SYSTEM', 'BATTERY', ''],
     D: ['', '', '', '', '', '', '', ''], E: ['', '', '', '', '', '', '', ''], F: ['', '', '', '', '', '', '', ''],
   };
@@ -560,6 +567,12 @@
     add('USS', 'C6', '27-2U', '400V BUS-B UNDER VOLTAGE (27-2U)', 'H', (p) => rl(p, '27-2U'));
     [1, 2, 3].forEach((n) => add('USS', 'C6', `MCC${n}`, `UNIT NO.${n} MCC POWER SUPPLY LOST`, 'H', (p) => p.ss && !p.ss.uaux[n]));
     add('USS', 'C6', 'P4F', '400V BUS FAULT (50/51)', 'H', (p) => p.ss && (p.ss.fault.P4A || p.ss.fault.P4B));
+    [1, 2, 3].forEach((n) => {
+      add('USS', 'B7', `63AQH1-${n}`, `PRIMARY AIR TANK #${n} PRESSURE LOW (63AQH1)`, 'L', (p) => p.air && !p.air.sw(p.air.u[n - 1].prim).H1, 30);
+      add('USS', 'B7', `63AQL-${n}`, `BRAKE AIR TANK #${n} PRESSURE LOW (63AQL)`, 'H', (p) => p.air && p.air.sw(p.air.u[n - 1].brake).L, 5);
+      add('USS', 'B7', `63AQI-${n}`, `INLET VALVE AIR TANK #${n} PRESSURE LOW (63AQH1)`, 'L', (p) => p.air && !p.air.sw(p.air.u[n - 1].iv).H1, 30);
+      add('USS', 'B7', `AC1-${n}`, `AIR COMPRESSOR 1 UNIT NO.${n} FAULT`, 'H', (p) => p.air && p.air.u[n - 1].c1.fail);
+    });
     // ---- MSS (main control house) ----
     add('MSS', 'B1', '5DI0044', '20KV 252B-A2 (CABLE FEEDER NO.1) OVER CURRENT', 'H', (p) => trp(p, '252B-A2'));
     add('MSS', 'B1', '27-L1M', 'CABLE TUNNEL FEEDER NO.1 UNDER VOLTAGE (27-L1M)', 'L', (p) => rl(p, '27-L1M') && p.ss.st['252B-A2']);
@@ -588,16 +601,204 @@
   M.ANN_WIN = Object.assign(M.ANN_WIN || {}, { USS: USS_WIN, MSS: MSS_WIN });
   MSS_WIN.C[7] = 'DAM WATER\nLEVEL';
 
+  /* ============================== PLANT CONTROL: JOINT CONTROL · 43SCH/WLC · JADWAL · WLC ============================== */
+  // jadwal harian (MW total plant per 15 menit) dari layar OPS 00031/00032/00034 (13-Okt-2017)
+  const q4 = (m0, m15, m30, m45) => { const a = []; for (let h = 0; h < 24; h++) a.push(m0[h], m15[h], m30[h], m45[h]); return a; };
+  const S1 = q4([50, 50, 45, 45, 45, 50, 55, 50, 50, 70, 210, 30, 30, 200, 20, 10, 70, 70, 100, 125, 175, 200, 175, 10],
+    [50, 50, 45, 45, 45, 50, 55, 50, 50, 210, 50, 30, 30, 50, 20, 10, 70, 70, 100, 150, 175, 200, 175, 10],
+    [50, 50, 45, 45, 45, 50, 55, 50, 50, 210, 50, 30, 30, 50, 20, 10, 70, 70, 100, 150, 175, 200, 175, 10],
+    [50, 50, 45, 45, 45, 50, 55, 50, 50, 210, 50, 30, 30, 50, 20, 10, 70, 70, 100, 150, 70, 200, 175, 0]);
+  const S1in = S1.map((v, i) => (Math.floor(i / 4) === 18 ? 210 : v));
+  const S2 = q4([45, 25, 25, 25, 25, 25, 50, 45, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 70, 150, 210, 210, 210, 45],
+    [45, 25, 25, 25, 25, 45, 50, 45, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 90, 185, 210, 210, 180, 45],
+    [25, 25, 25, 25, 25, 50, 45, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 45, 105, 195, 210, 210, 165, 45],
+    [25, 25, 25, 25, 25, 50, 45, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 70, 150, 200, 210, 210, 150, 45]);
+  const S4in = Array.from({ length: 96 }, (_, i) => { const h = Math.floor(i / 4); return h >= 15 && h <= 21 ? 105 : 30; });
+  const SCH_DEF = [
+    { key: 'SCH-1', name: 'RAINY/WEEKDAY', no: '00031', set: S1, inp: S1in, src: 'layar OPS 00031' },
+    { key: 'SCH-2', name: 'RAINY/WEEKEND', no: '00032', set: S2, inp: S2.slice(), src: 'layar OPS 00032' },
+    { key: 'SCH-3', name: 'DRY/WEEKDAY', no: '00033', set: S4in.slice(), inp: S4in.slice(), src: 'ASUMSI – layar 00033 belum ada, disalin dari pola DRY/WEEKEND' },
+    { key: 'SCH-4', name: 'DRY/WEEKEND', no: '00034', set: new Array(96).fill(0), inp: S4in, src: 'layar OPS 00034 (SET VALUE 0, INPUT VALUE belum di-SET)' },
+    { key: 'SCH-5', name: 'ARBITRARY SETUP', no: '00035', set: new Array(96).fill(70), inp: new Array(96).fill(70), src: 'ASUMSI – bebas diisi instruktur' },
+  ];
+  const ip = (pts, x) => { if (x <= pts[0][0]) return pts[0][1]; for (let i = 1; i < pts.length; i++) if (x <= pts[i][0]) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0); } return pts[pts.length - 1][1]; };
+  // kurva WLC (bentuk mengikuti layar 00036; nilai = ASUMSI)
+  const WLC_F1 = [[-1.5, -45], [-0.5, -12], [0, 0], [0.5, 12], [1.5, 45]];          // e (m) → MW per siklus
+  const WLC_F2 = [[575.0, 2.0], [576.5, 1.4], [577.5, 1.0], [581.0, 1.0]];           // WL → faktor
+  const QPMW = 21.1 / 70;                                                             // m3/s per MW (unit 70 MW ≈ 21.1 m3/s)
+  const MOL = 578.2, FSL = 579.1;                                                     // MOL dibaca dari grafik layar 00096
+  class PlantCtrl {
+    constructor(pl) {
+      this.plant = pl;
+      const d = new Date(); this.clock0 = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds(); this.date0 = d.getTime() - this.clock0 * 1000;
+      // selector panel SY/SS (layar 00027)
+      this.sel = { s343STEP: 'REMOTE', s443STEP: 'REMOTE', s343R: 'REMOTE', s443R: 'REMOTE', s343ASR: 'USE', car1: 'LOCK', car2: 'USE' };
+      this.mode = null;                       // 43SCH/WLC: null | 'SCH-1'..'SCH-5' | 'WLC'
+      this.jP = 140; this.jQ = 30; this.jPman = 140;
+      this.sch = SCH_DEF.map((s) => ({ key: s.key, name: s.name, no: s.no, src: s.src, set: s.set.slice(), inp: s.inp.slice() }));
+      this.wlc = { sp: 578.60, comp: 0, t: 0, ePrev: null, Kp: 60, hist: [], cyc: 900 };
+      this.hist = []; this.histT = 300;
+      this.dpo = { inflow: 14.6, bias: 0, P: 150, start: 16, next: 12, res: null };
+    }
+    syBlock() { const sl = this.plant.sy.sel; return sl.s143STEP === 'LOCAL' ? '143STEP = LOCAL (operasi dari panel lokal switchyard)' : sl.s143R === 'CENTRAL' ? '143R = CENTRAL (kontrol dari pusat)' : null; }
+    ssBlock(id) {
+      const d = DEV[id]; if (!d) return null; const mch = /^MCH/.test(d.loc), k = mch ? '343' : '443';
+      if (this.sel[`s${k}STEP`] === 'LOCAL') return `${k}STEP = LOCAL (operasi dari panel lokal ${mch ? 'main control house' : 'powerhouse'})`;
+      if (this.sel[`s${k}R`] === 'CENTRAL') return `${k}R = CENTRAL (kontrol dari pusat)`;
+      return null;
+    }
+    tod() { return (this.clock0 + this.plant.t) % 86400; }
+    nowMs() { return this.date0 + (this.clock0 + this.plant.t) * 1000; }
+    setClock(h, m) { this.clock0 = ((h * 3600 + m * 60 - this.plant.t) % 86400 + 86400) % 86400; }
+    idx(tod = this.tod()) { return Math.floor(tod / 900) % 96; }
+    alrMode(u) { return !u.sw.ALR ? 'MANUAL' : u.sw.JLR ? 'JOINT' : 'INDIVIDUAL'; }
+    aqrMode(u) { return !u.sw.AQR ? 'MANUAL' : u.sw.JQR ? 'JOINT' : u.sw.AQRC === 'AUTO' ? 'AUTO' : 'SEMI AUTO'; }
+    setAlr(u, m) { u.sw.ALR = m !== 'MANUAL'; u.sw.JLR = m === 'JOINT'; if (m === 'INDIVIDUAL') u.sw.alrSP = clamp(u.p.cb ? u.p.p : u.sw.alrSP, u.sw.minP, u.sw.maxP); if (m === 'MANUAL') u.p.pref = u.p.p; }
+    setAqr(u, m) { u.sw.AQR = m !== 'MANUAL'; u.sw.JQR = m === 'JOINT'; if (m === 'AUTO') u.sw.AQRC = 'AUTO'; if (m === 'SEMI AUTO') u.sw.AQRC = 'SEMI'; if (m === 'SEMI AUTO' || m === 'INDIVIDUAL') u.sw.aqrSP = u.p.q; if (m === 'MANUAL') u.p.qref = u.p.q; }
+    online(u) { return u.p.cb && !u.p.islanded && u.pos === 5; }
+    totals() { const us = this.plant.units.filter((u) => u.p.cb); return { p: us.reduce((a, u) => a + u.p.p, 0), q: us.reduce((a, u) => a + u.p.q, 0) }; }
+    jointP() { return this.plant.units.filter((u) => this.online(u) && u.sw.ALR && u.sw.JLR).reduce((a, u) => a + u.p.p, 0); }
+    jointQ() { return this.plant.units.filter((u) => this.online(u) && u.sw.AQR && u.sw.JQR).reduce((a, u) => a + u.p.q, 0); }
+    setMode(m) {
+      const pl = this.plant; if (this.mode === m) return;
+      this.mode = m; if (m === 'WLC') { this.wlc.t = 0; this.wlc.ePrev = pl.intakeWL - this.wlc.sp; this.wlc.comp = 0; }
+      if (!m) this.jPman = this.jP;
+      pl.log('CMD', `PLANT: 43SCH/WLC = ${m || 'OFF (set point manual)'}`);
+    }
+    schSet(k) { const s = this.sch[k]; s.set = s.inp.slice(); this.plant.log('CMD', `PLANT: SCHEDULE ${s.key} (${s.name}) SET – nilai input diterapkan`); }
+    schCancel(k) { const s = this.sch[k]; s.inp = s.set.slice(); }
+    wlcStep() {
+      const pl = this.plant, w = this.wlc, e = pl.intakeWL - w.sp, de = w.ePrev === null ? 0 : e - w.ePrev;
+      w.ePrev = e; w.comp = (w.Kp * de + ip(WLC_F1, e)) * ip(WLC_F2, pl.intakeWL);
+      this.jP = clamp(this.jP + w.comp, 0, 210);
+      pl.log('INFO', `PLANT: WLC siklus 15 menit – WL ${pl.intakeWL.toFixed(2)} m, e ${e >= 0 ? '+' : ''}${e.toFixed(2)} m → kompensasi ${w.comp.toFixed(1)} MW, joint SP ${this.jP.toFixed(1)} MW`);
+    }
+    tick(dt) {
+      const pl = this.plant, us = pl.units;
+      const jU = us.filter((u) => this.online(u) && u.sw.ALR && u.sw.JLR), jUq = us.filter((u) => this.online(u) && u.sw.AQR && u.sw.JQR);
+      // sumber set point joint control
+      if (this.mode && this.mode.startsWith('SCH')) this.jP = this.sch[+this.mode.slice(4) - 1].set[this.idx()];
+      else if (this.mode === 'WLC') { this.wlc.t += dt; if (this.wlc.t >= this.wlc.cyc) { this.wlc.t = 0; this.wlcStep(); } }
+      else if (!jU.length) this.jP = this.totals().p;                       // tanpa unit JOINT: set point mengikuti total (bumpless)
+      else this.jP = this.jPman;
+      if (!jUq.length) this.jQ = this.totals().q;
+      // pembagian ke unit JOINT: (SP joint − unit non-joint) dibagi rata (ASUMSI)
+      if (jU.length) {
+        const other = us.filter((u) => u.p.cb && !jU.includes(u)).reduce((a, u) => a + u.p.p, 0);
+        const share = (this.jP - other) / jU.length;
+        jU.forEach((u) => { u.sw.alrSP = clamp(share, u.sw.minP, u.sw.maxP); });
+      }
+      if (jUq.length) {
+        const other = us.filter((u) => u.p.cb && !jUq.includes(u)).reduce((a, u) => a + u.p.q, 0);
+        jUq.forEach((u) => { u.sw.aqrSP = clamp((this.jQ - other) / jUq.length, -40, 50); });
+      }
+      // trend WLC (tiap 60 s, 12 jam) & riwayat DPO (tiap 300 s, 24 jam)
+      this.wlc.hT = (this.wlc.hT || 60) + dt; if (this.wlc.hT >= 60) { this.wlc.hT = 0; this.wlc.hist.push([pl.t, pl.intakeWL]); if (this.wlc.hist.length > 720) this.wlc.hist.shift(); }
+      this.histT += dt; if (this.histT >= 300) { this.histT = 0; this.hist.push({ t: pl.t, tod: this.tod(), p: this.totals().p, wl: pl.intakeWL, rwl: pl.dam ? pl.dam.rwl : 0 }); if (this.hist.length > 288) this.hist.shift(); }
+    }
+    /* Daily Power Operation – CALCULATION (algoritma ASUMSI: neraca volume intake f7) */
+    calc() {
+      const pl = this.plant, d = this.dpo, qin = Math.max(0, d.inflow + d.bias);
+      const tod = this.tod(), now = tod / 3600, tStart = ((d.start - now) % 24 + 24) % 24;     // jam menuju start
+      const vol = (x) => volIntakeLocal(x), Vmol = vol(MOL), Vfsl = vol(FSL);
+      const qNow = 0;                                                         // pola peaking: sebelum START TIME pembangkit tidak beroperasi (air ditampung)
+      let V = vol(pl.intakeWL) + (qin - qNow) * tStart * 3600;
+      V = Math.min(V, Vfsl); const Vu = Math.max(0, V - Vmol);
+      const per = (P) => { const qn = P * QPMW - qin; return qn <= 0 ? 24 : Math.min(24, Vu / qn / 3600); };
+      // daya hasil: daya input dibatasi supaya air cukup sampai jadwal start berikutnya (d.next jam)
+      let Pr = Math.min(d.P, 210); const need = Math.min(24, Math.max(1, d.next));
+      if (per(Pr) < need) { let lo = 0, hi = Pr; for (let k = 0; k < 30; k++) { const mid = (lo + hi) / 2; if (per(mid) >= need) lo = mid; else hi = mid; } Pr = Math.floor(lo); }
+      const T = per(Pr), stop = (d.start + T) % 24;
+      d.res = { inflow: qin, P: Pr, period: T, stop, at: pl.t, tod, V0: vol(pl.intakeWL) };
+      // prakiraan 24 jam ke depan (tiap 15 menit)
+      const fc = []; let v = vol(pl.intakeWL);
+      const inv = (Vx) => { let x = pl.intakeWL; for (let k = 0; k < 4; k++) { const f = volIntakeLocal(x) - Vx, dd = (2 * 189.475 * x - 218232.925) * 1000; x -= f / dd; } return x; };
+      for (let k = 0; k <= 96; k++) {
+        const h = k * 0.25, Pk = h < tStart ? qNow / QPMW : (h < tStart + T ? Pr : 0);
+        fc.push({ h, p: Pk, wl: Math.min(FSL, inv(v)) });
+        v = Math.min(Vfsl, v + (qin - Pk * QPMW) * 900);
+      }
+      d.res.fc = fc; d.res.mol = MOL; d.res.qNow = qNow;
+      pl.log('CMD', `DPO: CALCULATION – inflow ${qin.toFixed(2)} m³/s, daya ${Pr} MW, available ${T.toFixed(1)} h, stop ${String(Math.floor(stop)).padStart(2, '0')}:00`);
+      return d.res;
+    }
+    planned() {   // nilai rencana pada waktu sekarang (dari hasil CALCULATION)
+      const r = this.dpo.res; if (!r) return null;
+      const h = (this.plant.t - r.at) / 3600; if (h > 24) return null;
+      const k = Math.min(96, Math.max(0, Math.round(h * 4))); return r.fc[k];
+    }
+  }
+  PlantCtrl.SCH = SCH_DEF; PlantCtrl.MOL = MOL; PlantCtrl.QPMW = QPMW; PlantCtrl.F1 = WLC_F1; PlantCtrl.F2 = WLC_F2;
+
+  /* ============================== AIR SUPPLY SYSTEM (layar 00010) ============================== */
+  // tekanan dalam p.u. nominal (nilai MPa tidak ada di layar). Kompresor 1 → primary air tank → governor pressure tank
+  // & (via reducing) brake air tank → shaft seal / brake / actuator. Kompresor 2 → inlet valve air tank → I/V pressure tank.
+  class AirSystem {
+    constructor(pl) {
+      this.plant = pl;
+      this.u = [1, 2, 3].map(() => ({ c1: { run: false, fail: false, hrs: 0 }, c2: { run: false, fail: false, hrs: 0 }, prim: 0.97, brake: 0.95, iv: 0.97, lastBrake: 0, lastIv: 0 }));
+      this.leak = [0, 0, 0];
+    }
+    sw(x) { return { H1: x >= 0.90, H2: x >= 0.985, L: x < 0.80 }; }
+    tick(dt) {
+      const pl = this.plant;
+      pl.units.forEach((un, i) => {
+        const a = this.u[i], p = un.p, pw = !pl.ss || pl.ss.unitAux(i + 1) || pl.ss.live.MCCCOM;
+        // konsumsi
+        a.prim -= (p.govOn ? 0.0006 : 0.00015) * dt + this.leak[i] * dt;
+        if (p.brake > 0.5 && a.lastBrake <= 0.5) a.brake -= 0.04;                      // satu kali aplikasi rem
+        a.lastBrake = p.brake;
+        a.brake -= (p.ax ? 0.0002 : 0.00005) * dt;                                       // shaft seal / actuator
+        if (Math.abs(p.iv - a.lastIv) > 1e-5) a.iv -= 0.0012 * dt; a.lastIv = p.iv;
+        a.iv -= 0.00008 * dt;
+        // reducing valve primary → brake
+        if (a.brake < 0.95 && a.prim > a.brake + 0.02) { const f = Math.min(0.004 * dt, 0.95 - a.brake); a.brake += f; a.prim -= f * 0.5; }
+        // kompresor (start < 0.90 / 63AQH1 off, stop ≥ 0.985 / 63AQH2 on)
+        for (const [c, k] of [[a.c1, 'prim'], [a.c2, 'iv']]) {
+          if (a[k] < 0.90) c.run = true; if (a[k] >= 0.985) c.run = false;
+          if (c.fail || !pw) c.run = false;
+          if (c.run) { a[k] += 0.003 * dt; c.hrs += dt / 3600; }
+          a[k] = clamp(a[k], 0, 1.0);
+        }
+        a.brake = clamp(a.brake, 0, 1.0);
+      });
+    }
+  }
+
+  /* ============================== RAIN FALL MONITOR (layar 00023) ============================== */
+  // RGS-1..6 (mm/h) & WLS-1/2 (El.m). Di OPS nilai '?' (tidak terkomunikasi) → simulator membangkitkan data sintetis.
+  class Rain {
+    constructor(pl) { this.plant = pl; this.I = 0; this.base = null; this.rgs = [0, 0, 0, 0, 0, 0]; this.fac = [1.15, 0.9, 1.05, 1.0, 0.8, 1.2]; this.acc = [0, 0, 0, 0, 0, 0]; this.t = 0; this.q = 0; }
+    set(I) { const pl = this.plant; if (I > 0 && this.base === null) this.base = pl.inflow; this.I = I; pl.log('CMD', `RAIN: intensitas hujan DAS = ${I} mm/h`); }
+    tick(dt) {
+      const pl = this.plant; this.t += dt;
+      this.rgs = this.fac.map((k, i) => Math.max(0, this.I * k * (1 + 0.15 * Math.sin(this.t / 900 + i * 1.7))));
+      this.rgs.forEach((r, i) => { this.acc[i] += r * dt / 3600; });
+      const avg = this.rgs.reduce((a, b) => a + b, 0) / 6;
+      // limpasan: tambahan inflow = 6 m3/s per mm/h rata-rata DAS, tunda ±30 menit (ASUMSI)
+      this.q = lag(this.q, 6 * avg, 1800, dt);
+      if (this.base !== null) { pl.inflow = this.base + this.q; if (this.I === 0 && this.q < 0.05) { pl.inflow = this.base; this.base = null; } }
+    }
+    wls(i) { const q = this.plant.inflow; return i === 0 ? 585.0 + 0.32 * Math.sqrt(q) : 579.0 + 0.30 * Math.sqrt(q); }   // ASUMSI rating curve
+  }
+
   /* ============================== REGISTRASI KE ENGINE ============================== */
   M.EXT.push({
     build(pl) {
-      pl.ss = new StationService(pl); pl.dam = new Dam(pl); pl.daily = new DailyOps(pl);
+      pl.ss = new StationService(pl); pl.dam = new Dam(pl); pl.daily = new DailyOps(pl); pl.pc = new PlantCtrl(pl); pl.air = new AirSystem(pl); pl.rain = new Rain(pl);
       // 152-LST: gangguan LSTr menahan close
       const sy = pl.sy, il = sy.interlock.bind(sy);
       sy.interlock = (d, close) => (d === '152-LST' && close && sy.lstFault) ? 'Gangguan LSTr masih ada (lockout)' : il(d, close);
+      // selector 143STEP / 143R: operasi switchyard dari OPS hanya saat REMOTE
+      const il2 = sy.interlock;
+      sy.interlock = (d, close) => pl.pc.syBlock() || il2(d, close);
+      // selector 343STEP/343R (MCH) & 443STEP/443R (powerhouse): blok perintah OPS (changeover otomatis tetap jalan)
+      const ssop = pl.ss.operate.bind(pl.ss);
+      pl.ss.operate = (id, close, who = 'OPS') => ((who === 'OPS' || who === 'MANUVER') && pl.pc.ssBlock(id)) || ssop(id, close, who);
     },
     points,
-    tick(pl, st) { pl.ss.tick(st); pl.dam.tick(st); pl.daily.tick(st); },
+    tick(pl, st) { pl.ss.tick(st); pl.dam.tick(st); pl.daily.tick(st); pl.pc.tick(st); pl.air.tick(st); pl.rain.tick(st);
+      const asr = pl.pc.sel.s343ASR === 'USE' ? 'AUTO' : 'LOCK'; if (pl.pc.asrLast !== asr) { pl.pc.asrLast = asr; pl.ss.aco.mch = asr; pl.ss.aco.ph = asr; } },
     inject(pl, key) {
       if (!NEW_SCN.some((x) => x.key === key)) return false;
       const s = M.SCN[key], ss = pl.ss;
@@ -608,6 +809,7 @@
         if (key === 'ss_sstr1') delete ss.fault.SST1P;
         if (key === 'ss_ph_busa') delete ss.fault.P4A;
         if (key === 'dam_flood') pl.inflow = 14.6;
+        if (key === 'air_comp_fail') { pl.air.u[0].c1.fail = false; pl.air.leak[0] = 0; }
         return true;
       }
       pl.fx[key] = { t0: pl.t }; pl.log('ALARM', `FAULT INJECT: ${s.name}`);
@@ -617,12 +819,14 @@
       if (key === 'ss_ph_busa') ss.fault.P4A = 'gangguan 400 V BUS-A powerhouse';
       if (key === 'ss_bc_live' && ss.st['289DLE-BC']) pl.log('INFO', 'SS: line Base Camp masih di-ground (289DLE-BC CLOSE) – GI baru menormalkan setelah 289DLE-BC OPEN');
       if (key === 'dam_flood') pl.inflow = 180;
+      if (key === 'air_comp_fail') { pl.air.u[0].c1.fail = true; pl.air.leak[0] = 0.00025; }
       ss.solve(); ss.checkFaults();
       return true;
     },
-    clear(pl) { pl.sy.lstFault = false; pl.ss.fault = {}; pl.inflow = 14.6; },
+    clear(pl) { pl.sy.lstFault = false; pl.ss.fault = {}; pl.inflow = 14.6; pl.air.u.forEach((a) => { a.c1.fail = false; a.c2.fail = false; }); pl.air.leak = [0, 0, 0]; pl.rain.I = 0; pl.rain.q = 0; pl.rain.base = null; },
     init(pl) { pl.ss.lineupNormal(); },
   });
+  M.PlantCtrl = PlantCtrl; M.AirSystem = AirSystem; M.Rain = Rain;
   M.StationService = StationService; M.Dam = Dam; M.SS_DEV = DEV; M.SS_REL27 = REL27; M.SS_LOADS = LOADS; M.SS_EDGES = EDGES;
   if (typeof module !== 'undefined' && module.exports) module.exports = M;
 })(typeof window !== 'undefined' ? window : globalThis);

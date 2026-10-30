@@ -4,7 +4,7 @@
   const M = window.MUSI;
   const P = new M.Plant();
   P.initOperating();
-  const SPEEDS = [1, 2, 5, 10, 20];
+  const SPEEDS = [1, 2, 5, 10, 20, 60];
   let scr = 'main', hist = [], mult = 5, paused = false, curU = 1, selFault = 'cw_main_trip', fsUnit = 1, trendU = 1;
   const silenced = new Set();
   const $ = (id) => document.getElementById(id);
@@ -97,7 +97,7 @@
   function scrMain() {
     let g = '';
     const pk = (y, s) => R(12, y, 140, 21, '', 'fill="#ff40ff" stroke="#000"') + T(82, y + 15, s, 'tc', 'style="fill:#200020;font-size:11px"');
-    g += pk(3, 'PT. PLN (PERSERO)') + pk(26, 'SEKTOR DALKIT') + pk(49, 'BENGKULU');
+    g += pk(3, 'PLN IP') + pk(26, 'UBP') + pk(49, 'BENGKULU');
     g += R(165, 15, 700, 45, '', 'fill="#ff40ff" stroke="#fff" stroke-width="3"') + T(515, 46, 'Musi Hydro Electric Power Station Graphic Menu', 'tc', 'style="fill:#fff;font-size:22px;font-weight:bold"');
     g += `<g data-a="nav:fault">${R(877, 6, 104, 18, '', 'fill="#ff6060" stroke="#000"')}${T(929, 19, 'FAULT SIM.', 'tc', 'style="fill:#000;font-size:10px"')}</g>`;
     g += `<g data-a="nav:prot">${R(877, 27, 104, 18, '', 'fill="#ff9090" stroke="#000"')}${T(929, 40, 'PROTECTION', 'tc', 'style="fill:#000;font-size:10px"')}</g>`;
@@ -112,7 +112,7 @@
     g += sec(76, 52, 'Annunciator', [[['Unit No.1', 'nav:ann1'], ['Unit No.2', 'nav:ann2'], ['Unit No.3', 'nav:ann3'], ['Mimic Panel (1/2)', 'nav:annmp1']], [['Station Service (USS)', 'nav:annuss'], ['Station Service (MSS)', 'nav:annmss'], ['Switchyard', 'nav:annsy'], ['Mimic Panel (2/2)', 'nav:annmp2']]], '#ffff40');
     g += sec(138, 34, 'Station View', [[['Station Service Overview', 'nav:sso'], ['150kV Switchyard', 'nav:sy'], ['Main Control House', 'nav:mch'], ['Underground Powerhouse', 'nav:uph']]], '#40ffff');
     const tot = P.units.reduce((a, u) => ({ p: a.p + (u.p.cb ? u.p.p : 0), q: a.q + (u.p.cb ? u.p.q : 0) }), { p: 0, q: 0 });
-    g += sec(182, 76, '', [[['SY/SS Control Panel', 'nav:ssc'], ['Air Supply System'], ['Intake & Reregulating Dam', 'nav:dam'], ['Rain Fall Monitor']], [['Schedule(Rainy/Weekday)'], ['Schedule(Rainy/Weekend)'], ['Schedule(Arbitrary Setup)'], ['Daily Power Operation', 'nav:dpo']], [['Schedule(Dry/Weekday)'], ['Schedule(Dry/Weekend)'], ['Water Level Control', 'nav:wlc']]], '#40ff40',
+    g += sec(182, 76, '', [[['SY/SS Control Panel', 'nav:ssc'], ['Air Supply System', 'nav:air'], ['Intake & Reregulating Dam', 'nav:dam'], ['Rain Fall Monitor', 'nav:rain']], [['Schedule(Rainy/Weekday)', 'nav:sch1'], ['Schedule(Rainy/Weekend)', 'nav:sch2'], ['Schedule(Arbitrary Setup)', 'nav:sch5'], ['Daily Power Operation', 'nav:dpo']], [['Schedule(Dry/Weekday)', 'nav:sch3'], ['Schedule(Dry/Weekend)', 'nav:sch4'], ['Water Level Control', 'nav:wlc'], ['Station Service Overview', 'nav:sso']]], '#40ff40',
       T(55, 225, 'Common', 'tc', 'style="fill:#ff40ff;font-size:15px"') + L(100, 182, 100, 258, 'ln') + T(150, 208, f(tot.p, 1) + '  MW', 't', 'style="fill:#ff40ff"') + T(150, 228, f(tot.q, 1) + '  MVar', 't', 'style="fill:#ff40ff"') + T(150, 248, 'WL ' + f(P.intakeWL, 2), 't', 'style="fill:#ff40ff"'));
     [1, 2, 3].forEach((n, i) => {
       const u = U(n), m = u.meas(), y = 268 + i * 84;
@@ -123,8 +123,8 @@
         T(108, y + 44, `${f(m.q)} MVar`, 't', 'style="fill:#ff40ff"') + T(190, y + 44, `${f(m.kv)} kV`, 't', 'style="fill:#ff40ff"') +
         T(108, y + 66, `${f(m.rpm)} RPM`, 't', 'style="fill:#ff40ff"') + T(190, y + 66, M.STEP[u.pos], 't', 'style="fill:#ffff80;font-size:9px"'));
     });
-    g += sec(522, 52, 'Analog Input', [[['Unit No.1', 'nav:ai1'], ['Unit No.2', 'nav:ai2'], ['Unit No.3', 'nav:ai3']], [['Station Service (USS)', 'nav:aiuss'], ['Station Service (MSS)', 'nav:aimss'], ['Switchyard', 'nav:sy'], ['Intake & Reregulating Dam', 'nav:aidam']]], '#ffa040');
-    g += T(495, 600, 'Tombol redup = layar yang belum dimodelkan (data belum tersedia) – ketuk untuk melihat data yang dibutuhkan.', 'tc dim', 'style="font-size:10px"');
+    g += sec(522, 52, 'Analog Input', [[['Unit No.1', 'nav:ai1'], ['Unit No.2', 'nav:ai2'], ['Unit No.3', 'nav:ai3']], [['Station Service (USS)', 'nav:aiuss'], ['Station Service (MSS)', 'nav:aimss'], ['Switchyard', 'nav:aisy'], ['Intake & Reregulating Dam', 'nav:aidam']]], '#ffa040');
+    g += T(495, 600, 'Semua menu aktif. Nilai bertanda ASUMSI di layar = data belum tersedia di dokumen PLTA Musi.', 'tc dim', 'style="font-size:10px"');
     g += T(495, 616, 'Instruktur: FAULT SIM. (kanan atas) untuk inisialisasi kondisi & injeksi gangguan.', 'tc dim', 'style="font-size:10px"');
     return g;
   }
@@ -703,7 +703,6 @@
         const n = +r[0], key = r[1]; let val = r[2]; if (val === 'true') val = true; if (val === 'false') val = false;
         const u = U(n); if (u.sw[key] === val) return;
         if (key === 's43CH' && val === 'USE') { dialog('MESSAGE', 'Mode Line Charging (43CH USE) belum dimodelkan.\nHanya dapat dipilih sebelum start unit.', null); return; }
-        if (key === 'JLR' || key === 'JQR') { dialog('MESSAGE', 'Joint control (JLR/JQR, SCH/WLC) belum dimodelkan.', null); return; }
         const lab = typeof val === 'boolean' ? (val ? 'USE' : 'LOCK') : val;
         dialog('SELECT', `UNIT NO.${n}\n${SWL[key] || key} → ${lab}\n\nEXECUTE ?`, () => { u.sw[key] = val; P.log('CMD', `U${n}: ${SWL[key] || key} ${lab}`); });
         return;
@@ -836,7 +835,7 @@
     if (info.html && scr !== 'trend' && (++htmlTick % 4)) return;   // layar teks: 1 Hz
     render();
   }
-  setInterval(() => { const d = new Date(); $('sDate').textContent = d.toDateString() + ' ' + d.toTimeString().slice(0, 8); }, 1000);
+  setInterval(() => { const d = P.pc ? new Date(P.pc.nowMs()) : new Date(); $('sDate').textContent = d.toDateString() + ' ' + d.toTimeString().slice(0, 8); }, 1000);
   window.HMIX = { P, M, T, R, L, PL, lamp, mline, b3, vbox, navBox, title, backBtn, esc, f, U, dialog, closeDlg, go, render: () => render(), fmtT, arR, arU,
     EXTS, EXTU, EXTA, TABS, NA_MSG, get scr() { return scr; } };
   window.hmiBack = () => { if (!$('dlg').classList.contains('hidden')) { closeDlg(); return true; } if (vb && vb.w < VB0.w - 1) { fitW(); return true; } if (scr !== 'main') { go('back'); return true; } return false; };

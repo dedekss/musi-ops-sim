@@ -96,7 +96,7 @@
     // diesel generator
     const dg = ss.dg;
     g += ln(530, 461, 530, 534, 'DGX') + cb(530, 543, '52DG', '52DG', 15) + ln(530, 552, 530, 597, 'DG');
-    g += `<g data-a="nav:ssc"><circle cx="530" cy="615" r="17" fill="${dg.run ? '#ff2020' : '#18e018'}" stroke="#fff" stroke-width="1.2"/>${T(530, 619, 'DG', 't tc', 'style="fill:#000;font-size:11px"')}</g>`;
+    g += `<g data-a="x:ssdgd"><circle cx="530" cy="615" r="17" fill="${dg.run ? '#ff2020' : '#18e018'}" stroke="#fff" stroke-width="1.2"/>${T(530, 619, 'DG', 't tc', 'style="fill:#000;font-size:11px"')}</g>`;
     g += T(566, 565, `${f(dg.v)}  V`, 't cy') + T(566, 578, `${f(ss.amps('52DG'))}  A`, 't cy') + T(566, 591, `${f(dg.kw)}  kW`, 't cy') + T(566, 604, `${f(dg.f)}  Hz`, 't cy');
     g += ssBtns('mchopen', 'MAIN CONTROL\nHOUSE CB OPEN', 'MCH') + seqLine('seqM');
     return g;
@@ -148,76 +148,148 @@
     return g;
   }
 
-  /* ============================== S/S OVERVIEW ============================== */
+  /* ============================== simbol tambahan (layar sistem) ============================== */
+  const PC = () => P.pc, AIR = () => P.air, RAIN = () => P.rain;
+  const C = { red: '#ff2020', grn: '#18e018', wht: '#e8e8e8', cy: '#4ce0ff', yel: '#ffff40', org: '#ff9a2a', brn: '#8a3a10' };
+  // lamp status ala OPS: hijau penuh = normal/ON, lingkaran kosong = OFF, merah = alarm
+  const lampS = (x, y, s) => s === 'alm' ? `<circle cx="${x}" cy="${y}" r="5" fill="${C.red}" stroke="#000"/>` : s ? `<circle cx="${x}" cy="${y}" r="5" fill="${C.grn}" stroke="#000"/>` : `<circle cx="${x}" cy="${y}" r="4.5" fill="none" stroke="${C.red}" stroke-width="1.2"/>`;
+  const lampBox = (x, y, w, rows) => R(x, y, w, rows.length * 16 + 6, 'box') + rows.map(([lab, s], i) => lampS(x + 12, y + 11 + i * 16, s) + T(x + 24, y + 15 + i * 16, lab, 't')).join('');
+  // valve manual (bowtie) – horisontal / vertikal
+  const vlv = (x, y, v = false, col = 'none', sk = C.wht) => v ? `<path d="M${x - 5},${y - 6} L${x + 5},${y - 6} L${x - 5},${y + 6} L${x + 5},${y + 6} Z" fill="${col}" stroke="${sk}" stroke-width="1"/>` :
+    `<path d="M${x - 6},${y - 5} L${x - 6},${y + 5} L${x + 6},${y - 5} L${x + 6},${y + 5} Z" fill="${col}" stroke="${sk}" stroke-width="1"/>`;
+  // solenoid valve: merah = energize, putih = de-energize; hijau = posisi AUTO/terbuka khusus
+  const sol = (x, y, on, v = false, col) => { const c = col || (on ? C.red : 'none'), s = col || (on ? C.red : C.wht); return vlv(x, y, v, c, s) + L(x, y, x, y - 13, 'ln') + `<circle cx="${x}" cy="${y - 18}" r="5" fill="${on ? C.red : 'none'}" stroke="${s}"/>` + T(x, y - 15, 'S', 'ts tc', 'style="font-size:7px"'); };
+  const pump = (x, y, run, lab, col) => { const c = col || (run ? C.red : C.grn); return `<circle cx="${x}" cy="${y}" r="9" fill="none" stroke="${c}" stroke-width="2"/><path d="M${x},${y + 6} L${x},${y - 5} M${x - 4},${y - 1} L${x},${y - 6} L${x + 4},${y - 1}" stroke="${c}" stroke-width="2" fill="none"/>` + (lab ? T(x - 14, y + 4, lab, 't tr') : ''); };
+  const filt = (x, y) => `<circle cx="${x}" cy="${y}" r="8" fill="none" stroke="${C.wht}"/><path d="M${x - 3},${y - 6} L${x - 3},${y + 6} M${x + 3},${y - 6} L${x + 3},${y + 6} M${x - 3},${y - 4} L${x + 3},${y + 4}" stroke="${C.wht}"/>`;
+  const relief = (x, y) => L(x, y, x, y - 10, 'ln') + `<path d="M${x - 4},${y - 10} L${x + 4},${y - 10} L${x},${y - 17} Z" fill="none" stroke="${C.wht}"/>` + L(x + 3, y - 18, x + 9, y - 24, 'ln');
+  const ptank = (x, y, w, h, lab) => `<path d="M${x},${y + 8} Q${x},${y} ${x + w / 2},${y} Q${x + w},${y} ${x + w},${y + 8} L${x + w},${y + h - 8} Q${x + w},${y + h} ${x + w / 2},${y + h} Q${x},${y + h} ${x},${y + h - 8} Z" fill="#000" stroke="${C.wht}"/>` + (lab ? mline(x + w / 2, y + h / 2 + 3, lab, 't tc', 10) : '');
+  const arrowR = (x, y) => `<path d="M${x - 6},${y - 4} L${x},${y} L${x - 6},${y + 4}" fill="none" stroke="${C.wht}"/>`;
+  const navRow = (items, cur) => items.map(([lab, act], i) => `<g class="nav ${act && act.slice(4) === cur ? 'cur' : ''}" ${act ? `data-a="${act}"` : ''}>${R(14 + i * 104, 583, 100, 52)}${mline(64 + i * 104, 612, lab, '', 10)}</g>`).join('');
+  const unitMW = (x = 748, y = 583) => { let g = R(x, y, 236, 52, 'box') + L(x, y + 22, x + 236, y + 22, 'ln') + L(x + 40, y, x + 40, y + 52, 'ln');
+    [1, 2, 3].forEach((n, i) => { const xx = x + 40 + i * 65.3; g += L(xx, y, xx, y + 52, 'ln') + T(xx + 33, y + 15, `UNIT#${n}`, 't tc') + T(xx + 58, y + 41, f(U(n).p.cb ? U(n).p.p : 0), 't tr'); });
+    return g + T(x + 20, y + 41, 'MW', 't tc'); };
+  const clk = () => { const s = PC().tod(); return `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}`; };
+
+  /* ============================== S/S OVERVIEW (layar 00005) ============================== */
+  const syS = (id) => !!P.sy.st[id];
+  const l150 = (on) => on ? 'l150' : 'ldd';
+  const dsY = (x, y, id) => { const c = syS(id); return `<g class="dev" data-a="dev:${id}"><circle cx="${x}" cy="${y}" r="7" class="${c ? 'devc' : 'devo'}"/>${L(x - 4, y - 4, x + 4, y + 4, 'devx')}${L(x + 4, y - 4, x - 4, y + 4, 'devx')}<rect x="${x - 12}" y="${y - 12}" width="24" height="24" fill="transparent"/></g>`; };
+  const cbY = (x, y, id) => { const c = syS(id); return `<g class="dev" data-a="dev:${id}"><rect x="${x - 7}" y="${y - 7}" width="14" height="14" class="cbsq ${c ? 'devc' : 'devo'}"/><rect x="${x - 12}" y="${y - 12}" width="24" height="24" fill="transparent"/></g>`; };
+  const cbU = (x, y, on, act) => `<g ${act ? `data-a="${act}"` : ''}><rect x="${x - 7}" y="${y - 7}" width="14" height="14" class="cbsq ${on ? 'devc' : 'devo'}"/></g>`;
+  const dsU = (x, y, on) => `<circle cx="${x}" cy="${y}" r="7" class="${on ? 'devc' : 'devo'}"/>${L(x - 4, y - 4, x + 4, y + 4, 'devx')}${L(x + 4, y - 4, x - 4, y + 4, 'devx')}`;
+  function xfc(x, y, c1, c2, r = 9) {   // trafo 2 belitan dengan warna tegangan
+    return `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${c1}" stroke-width="2"/><path d="M${x - 4},${y + 3} L${x},${y - 4} L${x + 4},${y + 3} Z" fill="none" stroke="${c1}"/>` +
+      `<circle cx="${x}" cy="${y + 2 * r - 2}" r="${r}" fill="none" stroke="${c2}" stroke-width="2"/><path d="M${x},${y + 2 * r - 2} l0,-5 M${x},${y + 2 * r - 2} l-4,4 M${x},${y + 2 * r - 2} l4,4" stroke="${c2}"/>`;
+  }
   function scrSSO() {
-    const ss = SS(), sy = P.sy; let g = title('STATION SERVICE OVERVIEW') + backBtn();
-    const box = (x, y, w, h, lab, node, act) => `<g ${act ? `data-a="${act}"` : ''}>${R(x, y, w, h, 'box')}${mline(x + w / 2, y + h / 2 + 4, lab, 't tc', 11)}${node ? `<rect x="${x + 3}" y="${y + 3}" width="8" height="8" fill="${ss.live[node] ? '#ff2020' : '#18e018'}"/>` : ''}</g>`;
-    // sumber
-    g += T(70, 56, 'SUMBER', 't tc cy');
-    g += box(15, 66, 110, 34, `LSTr 150/20 kV\n152-LST ${sy.st['152-LST'] ? 'CLOSE' : 'OPEN'}`, 'LST20', 'nav:sy');
-    g += box(15, 106, 110, 34, `LINE BASE CAMP\n& CURUP 20 kV`, 'BCLINE', 'nav:mch');
-    g += box(15, 146, 110, 34, `DIESEL GEN.\n${ss.dg.run ? f(ss.dg.v, 0) + ' V ' + f(ss.dg.f) + ' Hz' : 'STOP'}`, 'DG', 'nav:ssc');
-    [1, 2, 3].forEach((n, i) => { g += box(15, 186 + i * 40, 110, 34, `USTr No.${n}\n(GEN. ${n} ${f(U(n).p.vt * 10.9)} kV)`, `UT${n}S`, 'nav:uph'); });
-    // MCH
-    g += R(160, 50, 330, 260, 'boxd') + T(325, 66, 'MAIN CONTROL HOUSE', 't tc cy');
-    const bus = (x1, x2, y, node, lab, val) => ln(x1, y, x2, y, node, 1) + T(x1, y - 6, lab, 't') + T(x2, y - 6, val, 't tr cy');
-    g += bus(175, 320, 110, 'M20A', '20kV BUS-A', KV('M20A')) + bus(335, 475, 110, 'M20B', '20kV BUS-B', KV('M20B'));
-    g += bus(175, 290, 230, 'M4A', '400V A', V('M4A')) + bus(300, 350, 230, 'M4C', 'C', '') + bus(360, 475, 230, 'M4B', '400V B', V('M4B'));
-    g += T(325, 150, `LS ${MW('252-LS')}  ·  ID ${A('252DL-ID')}  ·  RD ${A('252DL-RD')}`, 't tc');
-    g += T(325, 170, `SSTr3 ${A('252B-A1')}  ·  SSTr4 ${A('252B-B1')}`, 't tc') + T(325, 190, `Cable 1 ${KW('252B-A2')}  ·  Cable 2 ${KW('252B-B2')}`, 't tc');
-    g += T(325, 260, `Beban 400 V MCH: ${f((ss.load.LG1 || 0) + (ss.load.LG2 || 0), 1)} kW`, 't tc') + T(325, 280, `DG: ${f(ss.dg.kw, 1)} kW · jam operasi ${f(ss.dg.hrs, 2)} h`, 't tc');
-    g += b3(255, 288, 140, 18, 'MAIN CONTROL HOUSE ▶', '', 'nav:mch');
-    // PH
-    g += R(520, 50, 455, 260, 'boxd') + T(747, 66, 'UNDERGROUND POWERHOUSE', 't tc cy');
-    g += bus(535, 735, 110, 'P4A', '400V BUS-A', V('P4A')) + bus(760, 960, 110, 'P4B', '400V BUS-B', V('P4B'));
-    g += T(747, 140, `SSTr1 → 352-L1 ${KW('352-L1')}   ·   SSTr2 → 352-L2 ${KW('352-L2')}`, 't tc');
-    [1, 2, 3].forEach((n, i) => { const y = 165 + i * 22; g += T(535, y, `UNIT ${n}: 452-${n} ${st('452-' + n) ? 'CLOSE' : 'OPEN'} · 352-${n}1 ${st(`352-${n}1`) ? 'CLOSE' : 'OPEN'} · 352-${n}2 ${st(`352-${n}2`) ? 'CLOSE' : 'OPEN'} · MCC ${ss.uaux[n] ? 'OK' : 'HILANG'}`, 't', `style="fill:${ss.uaux[n] ? '#e8e8e8' : '#ff5050'}"`); });
-    g += T(747, 245, `MCC common ${A('352-4')} · misc ${A('352B-B2') !== '0.0 A' ? A('352B-B2') : A('352B-A2')}`, 't tc');
-    g += b3(677, 288, 140, 18, 'UNDERGROUND P/H ▶', '', 'nav:uph');
-    // relai 27
-    g += T(495, 335, 'RELAI UNDER VOLTAGE 27 (merah = OPERATE / tegangan hilang)', 't tc cy');
-    Object.keys(REL).forEach((k, i) => { const x = 40 + (i % 4) * 240, y = 355 + Math.floor(i / 4) * 34; g += rly(x + 25, y, k) + T(x + 55, y + 4, REL[k][1].slice(0, 30), 'ts'); });
-    // changeover
-    g += T(495, 470, 'CHANGEOVER OTOMATIS', 't tc cy');
-    g += b3(150, 482, 330, 26, `MSSLCU (MCH) LSTr → DG : ${ss.aco.mch}`, ss.aco.mch === 'AUTO' ? 'yel' : '', 'x:ssaco:mch');
-    g += b3(510, 482, 330, 26, `USSLCU (P/H) → USTr / BUS-TIE : ${ss.aco.ph}`, ss.aco.ph === 'AUTO' ? 'yel' : '', 'x:ssaco:ph');
-    g += T(495, 530, ss.seqM ? `MSSLCU: ${ss.seqM.name} – langkah ${ss.seqM.i + 1}/${ss.seqM.steps.length}` : 'MSSLCU: siaga', 't tc', `style="fill:${ss.seqM ? '#ffff40' : '#888'}"`);
-    g += T(495, 548, ss.seqP ? `USSLCU: ${ss.seqP.name} – langkah ${ss.seqP.i + 1}/${ss.seqP.steps.length}` : 'USSLCU: siaga', 't tc', `style="fill:${ss.seqP ? '#ffff40' : '#888'}"`);
-    g += T(495, 585, 'Kotak kecil: merah = bertegangan, hijau = tidak bertegangan. Ketuk blok untuk membuka layar terkait.', 't tc dim');
-    g += T(495, 602, 'Interlock CB/DS: logic Alstom P0039-001/-002/-L001/-L002 · changeover: JEZ1L693 · tata letak MCH/PH: layar OPS.', 't tc dim');
+    const ss = SS(), sy = P.sy, lv = sy.busLive(); let g = title('STATION SERVICE OVERVIEW') + backBtn();
+    const K = { 150: '#ff2020', 11: '#2ec5e8', 20: '#ff8c1a', 4: '#ffe14d', d: '#4a4a4a' };
+    g += `<rect x="8" y="32" width="475" height="366" class="boxd"/><rect x="483" y="32" width="464" height="580" class="boxd" style="stroke-dasharray:2 3"/>`;
+    // bus 150 kV A / B
+    g += `<line x1="12" y1="37" x2="468" y2="37" class="${l150(lv.A)} lbus"/><line x1="12" y1="47" x2="468" y2="47" class="${l150(lv.B)} lbus"/>`;
+    const bays = [[3, 48], [2, 174], [1, 300]];
+    for (const [n, x] of bays) {
+      const u = U(n), xa = x - 28, xb = x + 27, hv = syS(`152-U${n}`) && ((syS(`189-U${n}A`) && lv.A) || (syS(`189-U${n}B`) && lv.B));
+      const gen = u.p.vt > 0.3, lvOn = hv || (gen && u.p.cb), cH = hv ? K[150] : K.d, cL = lvOn ? K[11] : K.d;
+      g += `<line x1="${xa}" y1="37" x2="${xa}" y2="70" class="${l150(syS(`189-U${n}A`) && lv.A)}"/><line x1="${xb}" y1="47" x2="${xb}" y2="70" class="${l150(syS(`189-U${n}B`) && lv.B)}"/>`;
+      g += dsY(xa, 77, `189-U${n}A`) + dsY(xb, 77, `189-U${n}B`) + mline(xa + 12, 75, `189\n-U${n}A`, 't', 10) + mline(xb + 12, 75, `189\n-U${n}B`, 't', 10);
+      g += `<polyline points="${xa},84 ${xa},100 ${xb},100 ${xb},84" class="${l150(hv)}"/><line x1="${x}" y1="100" x2="${x}" y2="181" class="${l150(hv)}"/>`;
+      g += cbY(x, 188, `152-U${n}`) + mline(x + 24, 188, `152\n-U${n}`, 't', 10) + `<line x1="${x}" y1="195" x2="${x}" y2="211" class="${l150(hv)}"/>`;
+      g += xfc(x, 220, cH, cL) + mline(x + 26, 228, `M.Tr\nNo.${n}`, 't', 10);
+      g += `<line x1="${x}" y1="245" x2="${x}" y2="282" stroke="${cL}" stroke-width="2"/><polyline points="${x},266 ${xb + 26},266 ${xb + 26},282" fill="none" stroke="${cL}" stroke-width="2"/>`;
+      g += dsU(x, 289, true) + T(x + 10, 293, `89-${n}`, 't') + dsU(xb + 26, 289, ss.st['89H-' + n]) + T(xb + 36, 293, `89H-${n}`, 't');
+      g += `<line x1="${x}" y1="296" x2="${x}" y2="310" stroke="${gen && u.p.cb ? K[11] : cL}" stroke-width="2"/>` + cbU(x, 317, u.p.cb, `navu:ctl`.replace('navu:ctl', `nav:ctl${n}`)) + T(x + 12, 321, `52-${n}`, 't');
+      g += `<line x1="${x}" y1="324" x2="${x}" y2="340" stroke="${gen ? K[11] : K.d}" stroke-width="2"/><g data-a="nav:ctl${n}"><circle cx="${x}" cy="357" r="15" fill="none" stroke="${gen ? C.red : C.grn}" stroke-width="2"/>${mline(x, 357, `No.${n}\nGS`, 'ts tc', 9).replace(/class="ts tc"/g, `class="ts tc" style="fill:${gen ? C.red : C.grn}"`)}</g>`;
+      const ux = xb + 26, ub = ss.live['UT' + n + 'S'];
+      g += `<line x1="${ux}" y1="296" x2="${ux}" y2="338" stroke="${ss.live['UT' + n + 'P'] ? K[11] : K.d}" stroke-width="2"/>` + xfc(ux, 347, ss.live['UT' + n + 'P'] ? K[11] : K.d, ub ? K[4] : K.d) + mline(ux + 22, 355, `USTr\nNo.${n}`, 't', 10);
+      g += `<line x1="${ux}" y1="372" x2="${ux}" y2="405" class="${lc('UT' + n + 'S')}"/>` + cb(ux, 412, '452-' + n, '452-' + n, 14, 4) + `<line x1="${ux}" y1="420" x2="${ux}" y2="442" class="${lc('UB' + n)}"/>`;
+    }
+    // LSTr bay
+    const lstHv = syS('152-LST') && ((syS('189-LSTA') && lv.A) || (syS('189-LSTB') && lv.B));
+    g += `<line x1="380" y1="37" x2="380" y2="70" class="${l150(syS('189-LSTA') && lv.A)}"/><line x1="433" y1="47" x2="433" y2="70" class="${l150(syS('189-LSTB') && lv.B)}"/>`;
+    g += dsY(380, 77, '189-LSTA') + dsY(433, 77, '189-LSTB') + mline(392, 75, '189\n-LSTA', 't', 10) + mline(445, 75, '189\n-LSTB', 't', 10);
+    g += `<polyline points="380,84 380,100 433,100 433,84" class="${l150(lstHv)}"/><line x1="406" y1="100" x2="406" y2="181" class="${l150(lstHv)}"/>` + cbY(406, 188, '152-LST') + mline(430, 188, '152\n-LST', 't', 10);
+    g += `<line x1="406" y1="195" x2="406" y2="216" class="${l150(lstHv)}"/><circle cx="406" cy="225" r="9" fill="none" stroke="${lstHv ? K[150] : K.d}" stroke-width="2"/><circle cx="406" cy="241" r="9" fill="none" stroke="${ss.live.LST20 ? K[20] : K.d}" stroke-width="2"/><circle cx="424" cy="233" r="9" fill="none" stroke="${ss.live.LST20 ? K[20] : K.d}" stroke-width="2"/>` + T(440, 237, 'LSTr', 't');
+    g += `<polyline points="406,250 406,265 493,265 493,195" class="${lc('LST20')}"/>`;
+    // ---------------- MCH ----------------
+    g += ln(568, 32, 568, 50, 'BCLINE') + ds(568, 57, '289DL-BC', '289DL-BC', 12, 4) + ln(568, 64, 568, 77, 'BCX') + cb(568, 84, '252DL-BC', '252DL-BC', 12, 4) + ln(568, 91, 568, 105, 'M20A');
+    g += ln(706, 32, 706, 50, 'IDLINE') + ds(706, 57, '289DL-ID', '289DL-ID', 12, 4) + ln(706, 64, 706, 77, 'IDX') + cb(706, 84, '252DL-ID', '252DL-ID', 12, 4) + ln(706, 91, 706, 105, 'M20B');
+    g += ln(877, 32, 877, 50, 'RDLINE') + ds(877, 57, '289DL-RD', '289DL-RD', 12, 4) + ln(877, 64, 877, 77, 'RDX') + cb(877, 84, '252DL-RD', '252DL-RD', 12, 4) + ln(877, 91, 877, 105, 'M20B');
+    g += rly(525, 65, '27-BC') + rly(525, 90, '27-1M') + rly(836, 90, '27-2M');
+    g += ln(488, 105, 666, 105, 'M20A', 1) + ln(682, 105, 932, 105, 'M20B', 1) + ds(674, 105, '289B', '289B', -12, -10);
+    g += ln(493, 105, 493, 116, 'M20A') + ds(493, 123, '289-LSA', '', 0) + mline(505, 127, '289\n-LSA', 't', 10) + ln(493, 130, 493, 181, 'LSB') + cb(493, 188, '252-LS', '252-LS', 11, 4) + ln(493, 195, 493, 265, 'LST20');
+    g += ln(716, 105, 716, 116, 'M20B') + ds(716, 123, '289-LSB', '', 0) + mline(730, 127, '289\n-LSB', 't', 10) + `<polyline points="716,130 716,150 493,150" class="${lc('LSB')}"/>`;
+    g += ln(548, 105, 548, 121, 'M20A') + cb(548, 128, '252B-A2', '', 0) + mline(570, 126, '252B\n-A2', 't', 10) + ln(548, 135, 548, 178, 'A2X') + ds(548, 185, '289B-A2', '', 0) + mline(570, 186, '289B\n-A2', 't', 10) + rly(577, 160, '27-L1M');
+    g += ln(548, 192, 548, 281, 'CAB1');
+    g += ln(603, 105, 603, 121, 'M20A') + cb(603, 128, '252B-A1', '', 0) + mline(625, 126, '252B\n-A1', 't', 10) + ln(603, 135, 603, 174, 'SST3P') + xf(603, 183, 'SST3P', 'SST3S', '') + mline(628, 194, 'SSTr\nNo.3', 't', 10) + ln(603, 212, 603, 225, 'SST3S') + cb(603, 232, '352-S1', '352-S1', 11, 4) + ln(603, 239, 603, 266, 'M4A');
+    g += ln(847, 105, 847, 121, 'M20B') + cb(847, 128, '252B-B1', '', 0) + mline(822, 126, '252B\n-B1', 't tr', 10) + ln(847, 135, 847, 174, 'SST4P') + xf(847, 183, 'SST4P', 'SST4S', '') + mline(822, 194, 'SSTr\nNo.4', 't tr', 10) + ln(847, 212, 847, 225, 'SST4S') + cb(847, 232, '352-S2', '', 0) + T(822, 236, '352-S2', 't tr') + ln(847, 239, 847, 266, 'M4B');
+    g += ln(921, 105, 921, 121, 'M20B') + cb(921, 128, '252B-B2', '', 0) + mline(898, 126, '252B\n-B2', 't tr', 10) + ln(921, 135, 921, 178, 'B2X') + ds(921, 185, '289B-B2', '', 0) + mline(898, 186, '289B\n-B2', 't tr', 10) + rly(890, 160, '27-L2M') + ln(921, 192, 921, 281, 'CAB2');
+    g += `<rect x="570" y="275" width="292" height="122" class="boxd"/>`;
+    g += ln(605, 266, 684, 266, 'M4A', 1) + cb(691, 266, '352-BT2', '', 0) + T(691, 255, '352-BT2', 't tc') + ln(698, 266, 755, 266, 'M4C', 1) + cb(762, 266, '352-BT3', '', 0) + T(762, 255, '352-BT3', 't tc') + ln(769, 266, 848, 266, 'M4B', 1);
+    g += rly(637, 252, '27-3M') + rly(812, 252, '27-4M');
+    [['352B-A3', 604, 'M4A'], ['352B-A4', 659, 'M4A'], ['352B-C1', 725, 'M4C'], ['352B-B3', 792, 'M4B'], ['352B-B4', 848, 'M4B']].forEach(([id, x, b]) => { g += ln(x, 266, x, 280, b) + cb(x, 287, id, '', 0) + mline(x + 10, 302, `352B\n-${id.slice(5)}`, 't', 10); });
+    g += pl([[604, 294], [604, 312], [792, 312], [792, 294]], 'LG1') + pl([[659, 294], [659, 318], [848, 318], [848, 294]], 'LG2');
+    g += ln(725, 294, 725, 335, 'DGX') + cb(725, 342, '52DG', '52DG', 11, 4) + ln(725, 349, 725, 360, 'DG') + `<g data-a="x:ssdgd"><circle cx="725" cy="375" r="14" fill="none" stroke="${ss.dg.run ? C.red : C.grn}" stroke-width="2"/>${T(725, 379, 'DG', 'ts tc', `style="fill:${ss.dg.run ? C.red : C.grn}"`)}</g>`;
+    // ---------------- POWERHOUSE ----------------
+    g += `<rect x="485" y="270" width="80" height="0"/>`;
+    g += ds(548, 288, '289L-1', '289L-1', 12, 4) + ln(548, 295, 548, 318, 'PL1') + rly(511, 308, '27-L1U') + cb(548, 325, '252-L1', '252-L1', -50, 4) + ln(548, 332, 548, 338, 'SST1P') + xf(548, 343, 'SST1P', 'SST1S', '') + mline(524, 350, 'SSTr\nNo.1', 't tr', 10) + ln(548, 372, 548, 405, 'SST1S') + cb(548, 412, '352-L1', '', 0) + T(535, 416, '352-L1', 't tr') + ln(548, 419, 548, 442, 'P4A');
+    g += ds(921, 288, '289L-2', '289L-2', -50, 4) + ln(921, 295, 921, 318, 'PL2') + rly(888, 308, '27-L2U') + cb(921, 325, '252-L2', '252-L2', -50, 4) + ln(921, 332, 921, 338, 'SST2P') + xf(921, 343, 'SST2P', 'SST2S', '') + mline(897, 350, 'SSTr\nNo.2', 't tr', 10) + ln(921, 372, 921, 405, 'SST2S') + cb(921, 412, '352-L2', '', 0) + T(908, 416, '352-L2', 't tr') + ln(921, 419, 921, 442, 'P4B');
+    g += `<rect x="862" y="270" width="85" height="128" class="boxd"/>`;
+    g += ln(540, 442, 721, 442, 'P4A', 1) + cb(728, 442, '352-BT1', '', 0) + T(728, 462, '352-BT1', 't tc') + ln(735, 442, 940, 442, 'P4B', 1) + rly(588, 430, '27-1U') + rly(885, 430, '27-2U');
+    g += b3(632, 409, 192, 17, 'POWER SUPPLY TO POWERHOUSE', '', 'x:ssmac:phnormal');
+    [['352B-A1', 630, 'P4A'], ['352B-A2', 689, 'P4A'], ['352B-B1', 766, 'P4B'], ['352B-B2', 822, 'P4B']].forEach(([id, x, b]) => { g += ln(x, 442, x, 465, b) + cb(x, 472, id, '', 0) + T(x + 12, 492, id, 't'); });
+    g += pl([[630, 479], [630, 498], [766, 498], [766, 479]], 'CF1') + ln(630, 498, 630, 528, 'CF1') + cb(630, 535, '352-4', '352-4', 12, 4);
+    g += pl([[689, 479], [689, 505], [822, 505], [822, 479]], 'MISC');
+    // unit 400 V
+    const ub = { 3: [52, 155, [57, 88, 120, 152]], 2: [180, 283, [186, 215, 248, 280]], 1: [305, 410, [310, 341, 372, 404]] };
+    for (const n of [3, 2, 1]) {
+      const [x1, x2, fx] = ub[n];
+      g += ln(x1, 442, x2, 442, 'UB' + n, 1);
+      [`352-${n}4`, `352-${n}3`, `352-${n}2`, `352-${n}1`].forEach((id, i) => { const x = fx[i]; g += ln(x, 442, x, 466, 'UB' + n) + cb(x, 473, id, '', 0) + mline(x + 12, 495, `352\n-${id.slice(4)}`, 't', 10); });
+      const i = 3 - n, ya = 530 + i * 12, yb = 548 + i * 12;
+      g += pl([[fx[3], 480], [fx[3], ya], [575 + i * 6, ya], [575 + i * 6, 443]], st(`352-${n}1`) && (ss.live.P4A || ss.live['UB' + n]) ? 'P4A' : '__');
+      g += pl([[fx[2], 480], [fx[2], yb], [885 + i * 6, yb], [885 + i * 6, 443]], st(`352-${n}2`) && (ss.live.P4B || ss.live['UB' + n]) ? 'P4B' : '__');
+    }
+    g += b3(12, 568, 100, 24, 'FLICKER RESET', '', 'x:ssfr:');
     return g;
   }
 
-  /* ============================== S/S CONTROL PANEL ============================== */
+  /* ============================== SWITCHYARD / STATION SERVICE CONTROL PANEL (layar 00027) ============================== */
   function scrSSC() {
-    const ss = SS(), dg = ss.dg, sy = P.sy; let g = title('SWITCHYARD / STATION SERVICE CONTROL PANEL') + backBtn();
-    const lampRow = (x, y, on, s, red = true) => `<circle cx="${x}" cy="${y}" r="6" class="lamp ${on ? (red ? 'lr' : 'lg') : ''}" fill="${on ? '' : '#333'}"/>` + T(x + 14, y + 4, s, 't');
-    g += R(20, 50, 300, 270, 'boxd') + T(170, 68, 'DIESEL GENERATOR (52DG)', 't tc cy');
-    g += b3(40, 82, 120, 30, 'DG START', dg.cmd ? 'pink' : '', 'x:ssdg:start') + b3(180, 82, 120, 30, 'DG STOP', !dg.cmd ? 'grn' : '', 'x:ssdg:stop');
-    g += lampRow(50, 135, dg.cmd && !dg.run && !dg.fail, 'CRANKING / STARTING') + lampRow(50, 155, dg.run, 'DG RUNNING (5DI0135)') + lampRow(50, 175, dg.ready, '84DG VOLTAGE ESTABLISHED') + lampRow(50, 195, dg.fail, 'START FAILURE (5DI0137)') + lampRow(50, 215, st('52DG'), '52DG CLOSED');
-    g += T(40, 245, `Tegangan  ${f(dg.v)} V`, 't cy') + T(40, 262, `Frekuensi ${f(dg.f)} Hz`, 't cy') + T(40, 279, `Daya      ${f(dg.kw)} kW`, 't cy') + T(40, 296, `Jam operasi ${f(dg.hrs, 2)} h`, 't cy');
-    g += T(40, 312, 'Rating DG belum ada data · start ± 8 s, 84DG +5 s (asumsi)', 'ts dim');
-    g += R(340, 50, 300, 270, 'boxd') + T(490, 68, 'CHANGEOVER OTOMATIS', 't tc cy');
-    g += T(360, 92, 'MSSLCU – LSTr → DG (MCH)', 't') + b3(360, 100, 120, 26, 'AUTO', ss.aco.mch === 'AUTO' ? 'yel' : '', 'x:ssaco:mch:AUTO') + b3(490, 100, 120, 26, 'LOCK', ss.aco.mch !== 'AUTO' ? 'yel' : '', 'x:ssaco:mch:LOCK');
-    g += T(360, 150, 'USSLCU – USTr / BUS-TIE (P/H)', 't') + b3(360, 158, 120, 26, 'AUTO', ss.aco.ph === 'AUTO' ? 'yel' : '', 'x:ssaco:ph:AUTO') + b3(490, 158, 120, 26, 'LOCK', ss.aco.ph !== 'AUTO' ? 'yel' : '', 'x:ssaco:ph:LOCK');
-    g += mline(490, 222, 'Pemicu: 27-1M & 27-2M (MCH) atau\n27-1U / 27-2U (P/H) operate ≥ 2 s.\nPrioritas USTr: No.3 > No.2 > No.1\n(unit paralel, beban > 20 %).', 't tc dim', 13);
-    g += R(660, 50, 310, 270, 'boxd') + T(815, 68, 'MANUVER CEPAT', 't tc cy');
-    g += b3(680, 82, 270, 28, 'MAIN CONTROL HOUSE CB OPEN', '', 'x:ssmac:mchopen');
-    g += b3(680, 118, 270, 28, 'MCH NORMAL (catu dari LSTr)', '', 'x:ssmac:mchnormal');
-    g += b3(680, 154, 270, 28, 'POWER SUPPLY TO POWERHOUSE', '', 'x:ssmac:phnormal');
-    g += b3(680, 190, 270, 28, 'FLICKER RESET (semua)', '', 'x:ssfr:');
-    g += mline(815, 255, 'Manuver dijalankan langkah demi langkah\nmelalui interlock; berhenti pada langkah\npertama yang ditolak.', 't tc dim', 13);
-    // switchyard summary
-    g += R(20, 335, 950, 120, 'boxd') + T(495, 352, '150 kV SWITCHYARD & LSTr', 't tc cy');
-    const lv = sy.busLive();
-    g += T(40, 378, `BUS-A ${lv.A ? 'LIVE' : 'DEAD'}   BUS-B ${lv.B ? 'LIVE' : 'DEAD'}   152-BT ${sy.st['152-BT'] ? 'CLOSE' : 'OPEN'}`, 't');
-    g += T(40, 398, `152-LST ${sy.st['152-LST'] ? 'CLOSE' : 'OPEN'}${sy.lstFault ? '  (GANGGUAN LSTr – LOCKOUT)' : ''}   189-LSTA ${sy.st['189-LSTA'] ? 'CLOSE' : 'OPEN'}   189-LSTB ${sy.st['189-LSTB'] ? 'CLOSE' : 'OPEN'}   TAP ${sy.tap}`, 't', sy.lstFault ? 'style="fill:#ff5050"' : '');
-    g += T(40, 418, `Sumber 20 kV LS: ${ss.live.LST20 ? 'BERTEGANGAN' : 'TIDAK BERTEGANGAN'}`, 't');
-    g += b3(780, 400, 170, 26, '150kV SWITCHYARD ▶', '', 'nav:sy');
-    // navigasi
-    g += b3(20, 470, 180, 30, 'S/S OVERVIEW', '', 'nav:sso') + b3(210, 470, 180, 30, 'MAIN CONTROL HOUSE', '', 'nav:mch') + b3(400, 470, 180, 30, 'UNDERGROUND P/H', '', 'nav:uph');
-    g += b3(590, 470, 180, 30, 'USS ANNUNCIATOR', '', 'nav:annuss') + b3(780, 470, 180, 30, 'MSS ANNUNCIATOR', '', 'nav:annmss');
-    g += seqLine(ss.seqM ? 'seqM' : 'seqP');
+    const pc = PC(), sy = P.sy, s = pc.sel; let g = title('SWITCHYARD / STATION SERVICE CONTROL PANEL') + backBtn();
+    const pair = (x, y, w, a, b, cur, act, h = 25) => b3(x, y, w, h, a[0], cur === a[1] ? 'yel' : '', `${act}:${a[1]}`) + b3(x + w, y, w, h, b[0], cur === b[1] ? 'yel' : '', `${act}:${b[1]}`);
+    // ---- switchyard control ----
+    g += R(18, 32, 925, 111, 'box') + R(364, 25, 225, 16, 'box') + T(476, 37, 'SWITCHYARD CONTROL', 't tc');
+    g += T(98, 62, '143STEP', 't tc') + pair(37, 71, 62, ['LOCAL', 'LOCAL'], ['REMOTE', 'REMOTE'], sy.sel.s143STEP, 'x:sysel:s143STEP');
+    g += T(246, 62, '143R', 't tc') + pair(178, 71, 68, ['REMOTE', 'REMOTE'], ['CENTRAL', 'CENTRAL'], sy.sel.s143R, 'x:sysel:s143R');
+    g += T(476, 62, 'BUS BAR PROTECTION RELAY SELECTOR', 't tc') + pair(407, 71, 67, ['LOCK', false], ['USE', true], sy.sel.busProt, 'x:sysel:busProt');
+    g += T(792, 53, 'CARRIER RELAY SELECTOR', 't tc') + pair(647, 61, 67, ['T/L NO.1\nLOCK', 'LOCK'], ['T/L NO.1\nUSE', 'USE'], pc.sel.car1, 'x:pcsel:car1', 24) + pair(798, 61, 67, ['T/L NO.2\nLOCK', 'LOCK'], ['T/L NO.2\nUSE', 'USE'], pc.sel.car2, 'x:pcsel:car2', 24);
+    g += T(792, 98, 'AUTOMATIC RECLOSING SELECTOR', 't tc') + pair(647, 106, 67, ['T/L NO.1\nLOCK', false], ['T/L NO.1\nUSE', true], sy.sel.L1ar, 'x:sysel:L1ar', 24) + pair(798, 106, 67, ['T/L NO.2\nLOCK', false], ['T/L NO.2\nUSE', true], sy.sel.L2ar, 'x:sysel:L2ar', 24);
+    // ---- station service control ----
+    g += R(18, 153, 925, 383, 'box') + R(364, 146, 225, 16, 'box') + T(476, 158, 'STATION SERVICE CONTROL', 't tc');
+    g += T(98, 180, '343STEP', 't tc') + pair(37, 190, 62, ['LOCAL', 'LOCAL'], ['REMOTE', 'REMOTE'], s.s343STEP, 'x:pcsel:s343STEP');
+    g += T(98, 225, '443STEP', 't tc') + pair(37, 235, 62, ['LOCAL', 'LOCAL'], ['REMOTE', 'REMOTE'], s.s443STEP, 'x:pcsel:s443STEP');
+    g += T(246, 180, '343R', 't tc') + pair(178, 188, 68, ['REMOTE', 'REMOTE'], ['CENTRAL', 'CENTRAL'], s.s343R, 'x:pcsel:s343R');
+    g += pair(178, 234, 68, ['REMOTE', 'REMOTE'], ['CENTRAL', 'CENTRAL'], s.s443R, 'x:pcsel:s443R') + T(246, 228, '443R', 't tc');
+    g += T(408, 180, '343ASR', 't tc') + pair(338, 190, 68, ['LOCK', 'LOCK'], ['USE', 'USE'], s.s343ASR, 'x:pcsel:s343ASR');
+    g += T(720, 179, '43SCH/WLC', 't tc');
+    ['SCH-1', 'SCH-2', 'SCH-3', 'SCH-4', 'SCH-5', 'WLC'].forEach((m, i) => { g += b3(509 + i * 69.5, 188, 67, 25, m, pc.mode === m ? 'yel' : '', `x:pcmode:${m}`); });
+    g += T(720, 232, pc.mode ? `set point joint dari ${pc.mode}${pc.mode === 'WLC' ? ' (siklus 15 menit)' : ` · jam ${clk()}`}` : 'tidak ada yang dipilih: set point joint diatur manual', 'ts tc dim');
+    const tot = pc.totals();
+    const vb = (x, lab, val, act) => (act ? b3(x, 273, 135, 25, lab, '', act) + R(x + 3, 300, 134, 27, 'box') : R(x, 275, 134, 52, 'box') + mline(x + 67, 291, lab, 't tc', 10)) + T(x + 68, 318, val, 't tc');
+    g += vb(28, 'JOINT CONTROL SET\nPOINT ACTIVE POWER', `${f(pc.jP)}  MW`, 'x:pcjp') + vb(180, 'JOINT CONTROL\nACTIVE POWER', `${f(pc.jointP())}  MW`) + vb(328, 'TOTAL\nACTIVE POWER', `${f(tot.p)}  MW`);
+    g += vb(500, 'JOINT CONTROL SET\nPOINT REACTIVE POWER', `${f(pc.jQ)}  MVar`, 'x:pcjq') + vb(652, 'JOINT CONTROL\nREACTIVE POWER', `${f(pc.jointQ())}  MVar`) + vb(800, 'TOTAL\nREACTIVE POWER', `${f(tot.q)}  MVar`);
+    [1, 2, 3].forEach((n, i) => {
+      const x = 27 + i * 311, u = U(n), am = pc.alrMode(u), qm = pc.aqrMode(u);
+      g += R(x, 340, 292, 195, 'box') + R(x + 70, 334, 152, 13, '', 'fill="#000"') + T(x + 146, 344, `UNIT NO.${n} CONTROL MODE`, 't tc');
+      g += T(x + 73, 359, '43STEP', 't tc') + pair(x + 9, 368, 62, ['LOCAL', 'LOCAL'], ['REMOTE', 'REMOTE'], u.sw.s43STEP, `sw:${n}:s43STEP`);
+      g += T(x + 222, 359, '43R', 't tc') + pair(x + 157, 368, 63, ['REMOTE', 'REMOTE'], ['CENTRAL', 'CENTRAL'], u.sw.s43R, `sw:${n}:s43R`);
+      g += T(x + 73, 405, 'ALR CONTROL MODE', 't tc') + b3(x + 9, 413, 125, 25, 'JOINT', am === 'JOINT' ? 'yel' : '', `x:ualr:${n}:JOINT`) + b3(x + 9, 438, 62, 25, 'MANUAL', am === 'MANUAL' ? 'yel' : '', `x:ualr:${n}:MANUAL`) + b3(x + 71, 438, 63, 25, 'INDIVIDUAL', am === 'INDIVIDUAL' ? 'yel' : '', `x:ualr:${n}:INDIVIDUAL`);
+      g += T(x + 222, 405, 'AQR CONTROL MODE', 't tc') + b3(x + 157, 413, 62, 25, 'AUTO', qm === 'AUTO' ? 'yel' : '', `x:uaqr:${n}:AUTO`) + b3(x + 219, 413, 63, 25, 'JOINT', qm === 'JOINT' ? 'yel' : '', `x:uaqr:${n}:JOINT`) + b3(x + 157, 438, 62, 25, 'MANUAL', qm === 'MANUAL' ? 'yel' : '', `x:uaqr:${n}:MANUAL`) + b3(x + 219, 438, 63, 25, 'SEMI AUTO', qm === 'SEMI AUTO' ? 'yel' : '', `x:uaqr:${n}:SEMI AUTO`);
+      const cell = (xx, w, lab, val, unit, act) => `<g ${act ? `data-a="${act}"` : ''}>${R(xx, 476, w, 30, 'box')}${mline(xx + w / 2, 490, lab, 't tc', 10)}${R(xx, 506, w, 29, 'box')}${T(xx + w / 2, 519, val, 't tc')}${T(xx + w - 4, 531, unit, 'ts tr')}</g>`;
+      g += cell(x + 9, 62, 'ALR SET\nPOINT', f(u.sw.alrSP), 'MW', `x:ualrsp:${n}`) + cell(x + 71, 63, 'ACTIVE\nPOWER', f(u.p.cb ? u.p.p : 0), 'MW') + cell(x + 157, 62, 'AQR SET\nPOINT', f(u.sw.aqrSP), 'MVar', `x:uaqrsp:${n}`) + cell(x + 219, 63, 'REACTIVE\nPOWER', f(u.p.cb ? u.p.q : 0), 'MVar');
+    });
+    g += navRow([['UNIT NO.1\nCONTROL PANEL', 'nav:ctl1'], ['UNIT NO.2\nCONTROL PANEL', 'nav:ctl2'], ['UNIT NO.3\nCONTROL PANEL', 'nav:ctl3'], ['SWITCHYARD/\nSTATION SERVICE\nCONTROL PANEL', 'nav:ssc'], ['SCH/WLC\nCONTROL PANEL', 'nav:sch1'], ['', ''], ['150kV\nSWITCHYARD', 'nav:sy'], ['MAIN CONTROL\nHOUSE', 'nav:mch'], ['UNDERGROUND\nPOWERHOUSE', 'nav:uph']], 'ssc');
     return g;
   }
 
@@ -241,7 +313,7 @@
     if (manual) g += b3(x - 4, y + h + 31, 19, 16, '▲', '', `${act}:1`) + b3(x + 17, y + h + 31, 19, 16, '▼', '', `${act}:-1`);
     return g;
   }
-  function scrDam() {
+  function scrDamX() {
     const d = DAM(), pl = P; let g = title('INTAKE DAM & RE-REGULATING DAM') + backBtn();
     // intake
     g += R(10, 40, 480, 590, 'boxd') + T(250, 57, 'INTAKE DAM (RTU-I)', 't tc cy');
@@ -275,7 +347,7 @@
     g += b3(560, 590, 190, 26, 'SET Qn RE-DAM', '', 'x:dam:rqn') + b3(760, 590, 190, 26, 'ANALOG INPUT DAM ▶', '', 'nav:aidam');
     return g;
   }
-  function scrWLC() {
+  function scrRDC() {
     const d = DAM(); const sp = d.rHist.length > 1 ? d.rHist : [d.rwl, d.rwl];
     const W = 520, H = 120, lo = Math.min(...sp, d.plannedRWL) - 0.3, hi = Math.max(...sp, d.RFSL) + 0.2;
     const pts = sp.map((v, i) => `${(i / (sp.length - 1)) * W},${H - (v - lo) / (hi - lo) * H}`).join(' ');
@@ -310,95 +382,420 @@
       <div class="row">${sb('INTAKE & RE-DAM ▶', 'nav:dam')}${sb('TREND PLANT ▶', 'nav:trend')}</div></div></div>`;
   }
 
-  /* ============================== TURBINE ACTUATOR ============================== */
+  const GVL = {};
+  /* ============================== HYDRAULIC TURBINE ACTUATOR CONTROL SYSTEM (layar 00011) ============================== */
   function scrTact(n) {
-    const u = U(n), p = u.p, F = u.fx; let g = title(`NO.${n} TURBINE ACTUATOR (GOVERNOR OIL SYSTEM)`) + backBtn();
-    const sumpT = u.govSumpT ? u.govSumpT() : 45;
-    // tangki tekanan
-    g += R(60, 70, 110, 220, 'box') + T(115, 62, 'PRESSURE OIL TANK', 't tc');
-    const lv = Math.max(0, Math.min(1, p.govLvl)); g += `<rect x="61" y="${70 + 220 * (1 - lv * 0.6)}" width="108" height="${220 * lv * 0.6}" fill="#7a5a10"/>`;
-    g += T(115, 150, `${f(p.govP * 100)} %`, 't tc', 'style="fill:#4ce0ff;font-size:16px"') + T(115, 168, 'TEKANAN', 't tc') + T(115, 270, `LEVEL ${f(p.govLvl * 100)} %`, 't tc cy');
+    const u = U(n), p = u.p, F = u.fx, lo = !!(u.lo['86-1'] || u.lo['86-2']); let g = title(`NO.${n} UNIT HYDRAULIC TURBINE ACTUATOR CONTROL SYSTEM`) + backBtn();
+    const sumpT = u.govSumpT ? u.govSumpT() : 45, run = p.speed > 0.05;
+    // rem generator 75S
+    g += mline(28, 66, 'GENERATOR\nBRAKE SOLENOID VALVE', 't', 11) + T(62, 92, '75S', 't');
+    g += L(28, 114, 62, 114, 'ln') + sol(68, 114, p.brakeCmd === 'apply' || p.brake > 0.5) + L(74, 114, 112, 114, 'ln') + arrowR(112, 114) + mline(118, 117, 'to GENERATOR\nBRAKE', 't', 11);
+    g += L(68, 120, 68, 157, 'ln') + L(68, 157, 112, 157, 'ln') + mline(118, 161, 'from BRAKE\nAIR TANK', 't', 11);
+    // GV position
+    g += R(240, 48, 168, 40, 'box') + T(248, 63, 'to WICKET GATE SERVOMOTOR', 't') + T(248, 81, `GUIDE VANE POS.   ${f(p.gv)}  %`, 't') + T(413, 52, 'CLOSE', 't') + T(413, 71, 'OPEN', 't');
+    g += L(408, 56, 470, 56, 'ln') + L(408, 74, 450, 74, 'ln') + L(470, 56, 470, 180, 'ln') + L(450, 74, 450, 180, 'ln');
+    // 20ST
+    g += mline(258, 128, 'TURBINE\nSTART/STOP\nSOLENOID VALVE\n20ST', 't', 11) + T(230, 179, 'START', 't') + T(300, 179, 'STOP', 't');
+    g += sol(268, 182, p.govOn) + L(248, 182, 262, 182, 'ln') + L(274, 182, 290, 182, 'ln') + L(268, 188, 268, 297, 'ln') + vlv(268, 230, true) + L(240, 190, 240, 202, 'ln');
+    // header tekanan
+    g += L(330, 150, 650, 150, 'ln') + L(350, 150, 350, 300, 'ln') + L(390, 150, 390, 300, 'ln') + L(610, 150, 610, 300, 'ln') + L(650, 40, 650, 330, 'ln') + L(650, 40, 790, 40, 'ln');
+    [390, 610].forEach((x) => { g += vlv(x, 183, true) + R(x + 4, 178, 8, 10, 'box'); });
+    [425, 470, 518, 563].forEach((x) => { g += vlv(x, 238, true) + L(x, 210, x, 300, 'ln'); });
+    g += L(425, 210, 563, 210, 'ln') + R(640, 238, 18, 16, 'box') + L(643, 241, 655, 251, 'ln') + L(655, 241, 643, 251, 'ln');
+    // 650G distributing valve
+    const gvMove = Math.abs((GVL[n] === undefined ? p.gv : GVL[n]) - p.gv) > 0.01; GVL[n] = p.gv;
+    g += `<g transform="translate(493,303)"><path d="M-18,-8 L18,8 M-18,8 L18,-8 M-8,-18 L8,18 M8,-18 L-8,18" stroke="${C.wht}" stroke-width="1.4"/><circle r="5" fill="${gvMove ? C.yel : '#000'}" stroke="${C.wht}"/></g>` + `<path d="M480,282 Q493,270 506,282" fill="none" stroke="${C.wht}"/>` + T(493, 268, '650G', 't tc');
+    g += L(470, 180, 470, 285, 'ln') + L(450, 180, 450, 290, 'ln') + L(320, 300, 650, 300, 'ln');
+    // 20SD emergency stop & overspeed
+    g += T(730, 127, '20SD', 't') + sol(722, 147, !lo) + L(650, 147, 716, 147, 'ln') + L(728, 147, 790, 147, 'ln') + L(722, 153, 722, 175, 'ln') + L(722, 175, 735, 183, 'ln');
+    g += mline(708, 196, 'EMERGENCY\nSTOP SOLENOID\nVALVE', 't', 11);
+    g += L(790, 40, 790, 200, 'ln') + vlv(790, 62, false) + L(796, 62, 840, 62, 'ln') + `<g><circle cx="855" cy="62" r="9" fill="none" stroke="${p.speed > 1.4 ? C.red : C.grn}" stroke-width="2"/><path d="M842,57 l-6,5 l6,5" fill="none" stroke="${p.speed > 1.4 ? C.red : C.grn}"/>${L(836, 62, 846, 62, '')}</g>`;
+    g += mline(815, 86, 'MECHANICAL OVERSPEED\nPENDULUM', 't', 11);
+    // 20MC / 20TV
+    const man = u.ctrl && u.ctrl.govRemote === false;
+    g += T(773, 233, 'OPEN', 't') + T(852, 233, 'CLOSE', 't') + `<g transform="translate(808,250)"><path d="M-14,-6 L14,6 M-14,6 L14,-6 M-6,-14 L6,14 M6,-14 L-6,14" stroke="${C.wht}" stroke-width="1.3"/></g>`;
+    g += `<circle cx="785" cy="250" r="5" fill="none" stroke="${C.wht}"/>` + T(785, 253, 'S', 'ts tc', 'style="font-size:7px"') + `<circle cx="831" cy="250" r="5" fill="none" stroke="${C.wht}"/>` + T(831, 253, 'S', 'ts tc', 'style="font-size:7px"');
+    g += T(842, 252, '20MC', 't') + mline(843, 275, 'MANUAL GUIDE VANE\nOPEN/CLOSE', 't', 11) + L(790, 200, 808, 236, 'ln') + L(808, 264, 808, 300, 'ln') + L(835, 200, 835, 320, 'ln');
+    g += T(800, 286, 'MAN', 't') + T(842, 306, '20TV', 't') + mline(845, 327, 'MANUAL/AUTO\nSELECTION VALVE', 't', 11) + T(793, 348, 'AUTO', 't');
+    g += `<path d="M800,309 L800,321 L820,309 L820,321 Z" fill="${man ? C.red : C.grn}" stroke="${man ? C.red : C.grn}"/><circle cx="826" cy="315" r="5" fill="${C.red}" stroke="${C.red}"/>` + T(826, 318, 'S', 'ts tc', 'style="font-size:7px"') + L(808, 300, 812, 309, 'ln') + L(810, 321, 810, 375, 'ln');
+    // 20QMV
+    g += sol(675, 385, p.govOn, true) + T(700, 389, '20QMV', 't') + L(650, 330, 650, 420, 'ln') + L(650, 385, 669, 385, 'ln') + L(681, 385, 810, 385, 'ln') + L(320, 420, 650, 420, 'ln');
+    // governor pressure tank
+    g += lampBox(10, 246, 150, [['71QPA', p.govLvl < 0.85 || p.govLvl > 1.08 ? 'alm' : true], ['71QPL-1', p.govLvl < 0.85 ? 'alm' : true], ['71QPL-2', p.govLvl < 0.75 ? 'alm' : true]]).replace(/width="150"/, 'width="150"');
+    g += [['63QH', p.govP > 1.05 ? 'alm' : true], ['63QL-1', p.govP < 0.85 ? 'alm' : true], ['63QL-2', p.govP < 0.75 ? 'alm' : true]].map(([lab, s0], i) => lampS(97, 257 + i * 16, s0) + T(109, 261 + i * 16, lab, 't')).join('') + L(85, 248, 85, 298, 'ln');
+    g += `<rect x="195" y="292" width="46" height="62" rx="10" fill="url(#gTank)" stroke="${C.wht}"/><defs><linearGradient id="gTank"><stop offset="0" stop-color="#555"/><stop offset=".5" stop-color="#ddd"/><stop offset="1" stop-color="#555"/></linearGradient></defs>`;
+    g += L(200, 354, 200, 362, 'ln') + L(235, 354, 235, 362, 'ln') + relief(240, 292) + mline(232, 263, 'GOVERNOR\nPRESSURE\nTANK', 't', 11) + T(218, 330, `${f(p.govP * 100, 0)}%`, 'ts tc', 'style="fill:#000"');
+    g += mline(14, 322, 'from\nPRIMARY\nAIR TANK', 't', 11) + L(14, 343, 120, 343, 'ln') + vlv(95, 343) + sol(130, 343, P.air && P.air.u[n - 1].prim > 0.5 && p.govLvl < 0.98) + L(136, 343, 182, 343, 'ln') + vlv(185, 343) + L(191, 343, 195, 343, 'ln') + T(132, 365, '20ASG', 't');
+    g += L(205, 362, 205, 410, 'ln') + vlv(205, 383, true) + L(230, 362, 230, 410, 'ln') + vlv(230, 383, true) + L(230, 410, 650, 410, 'ln');
+    // leakage tank
+    g += R(25, 548, 140, 62, '', `fill="${C.brn}" stroke="${C.wht}"`) + T(95, 601, 'LEAKAGE OIL TANK', 't tc') + pump(97, 571, F.gov_oil_leak && run, '', C.wht) + T(85, 575, '88LQ1', 't tr');
+    g += lampBox(100, 522, 62, [['71QLH', F.gov_oil_leak ? 'alm' : true]]);
+    g += L(45, 548, 45, 430, 'ln') + vlv(45, 500, true) + L(90, 548, 90, 430, 'ln') + vlv(90, 500, true) + L(45, 430, 190, 430, 'ln') + L(190, 430, 190, 420, 'ln') + `<path d="M135,426 l8,4 l-8,4 Z" fill="none" stroke="${C.wht}"/>`;
     // sump & pompa
-    g += R(40, 380, 270, 90, 'box') + T(175, 372, 'SUMP TANK', 't tc') + T(175, 420, `LEVEL ${f(100 * (F.gov_oil_leak ? 0.93 : 1))} %   ·   SUHU ${f(sumpT)} ℃`, 't tc cy');
-    p.qp.forEach((q, i) => {
-      const x = 205 + i * 85, col = q.fail ? '#ff2020' : q.run ? '#ff2020' : '#18e018';
-      g += `<circle cx="${x}" cy="320" r="18" fill="none" stroke="${col}" stroke-width="2.5"/>` + T(x, 324, q.name, 't tc', 'style="font-size:9px"');
-      g += T(x, 352, q.fail ? 'FAULT' : q.run ? 'RUN' : (p.qpMain === i ? 'MAIN' : 'STANDBY'), 't tc', `style="fill:${q.fail ? '#ff5050' : q.run ? '#ffff40' : '#888'}"`);
-      g += L(x, 338, x, 380, 'ln') + L(x, 302, x, 270, 'ln') + L(x, 270, 170, 270, 'ln');
-    });
-    // servomotor
-    g += R(400, 120, 260, 70, 'box') + T(530, 112, 'GUIDE VANE SERVOMOTOR', 't tc');
-    const gv = p.gv / 100; g += `<rect x="${405 + 200 * gv}" y="125" width="14" height="60" fill="#b4b4b4"/>` + L(419 + 200 * gv, 155, 690, 155, 'ln');
-    g += T(530, 210, `BUKAAN GV ${f(p.gv)} %   ·   LIMIT 7-77 ${f(p.gvLim)} %`, 't tc cy');
-    g += L(170, 150, 400, 150, 'ln') + T(285, 142, 'oli tekanan → distributing valve', 'ts tc dim');
-    // status & lamp
-    const lamps = [['65S GOVERNOR START', p.govOn], ['20SD QUICK SHUTDOWN (86-1/86-2)', !!(u.lo['86-1'] || u.lo['86-2'])], ['33GVL GUIDE VANE LOCKED', !!F.gv_locked],
-      ['33GVlb GV FULLY CLOSE', p.gv < 0.3], ['74mb GV NO-LOAD POSITION', u.s74mb ? u.s74mb() : false], ['63QL-1 PRESSURE LOW 1ST (<85 %)', p.govP < 0.85],
-      ['63QL-2 PRESSURE LOW 2ND (<75 %)', p.govP < 0.75], ['71QPL-1 TANK LEVEL LOW 1ST', p.govLvl < 0.85], ['71QPL-2 TANK LEVEL LOW 2ND', p.govLvl < 0.75],
-      ['SUMP OIL TEMP HIGH 1ST (60 ℃)', sumpT > 60], ['SUMP OIL TEMP HIGH 2ND (65 ℃)', sumpT > 65], ['CATU MCC UNIT', P.auxOK(n)]];
-    lamps.forEach(([s, on], i) => { const x = 720, y = 80 + i * 22; g += lamp(x, y, on) + T(x + 14, y + 4, s, 't'); });
-    g += T(400, 250, `MODE GOVERNOR: ${p.cb && !p.islanded ? u.sw.gov : p.govOn ? 'SPEED' : '—'}`, 't') + T(400, 270, `PUTARAN ${f(p.speed * 100)} %   ·   DAYA ${f(p.p)} MW`, 't');
-    g += mline(495, 560, 'Tekanan & level ditampilkan dalam % nilai nominal (nilai MPa / liter tidak tersedia di dokumen).\nAmbang 1ST/2ND: JEZ2K031 SH.002/003 (setelan asumsi). Pompa 88QP berhenti bila catu MCC unit hilang.', 't tc dim', 13);
+    g += R(180, 548, 710, 62, '', `fill="${C.brn}" stroke="${C.wht}"`) + T(550, 601, 'OIL SUMP TANK FOR GOVERNOR OIL SYSTEM', 't tc') + T(260, 601, `${f(sumpT)} ℃`, 'ts', `style="fill:${sumpT > 60 ? '#ff8080' : '#ffd0a0'}"`);
+    g += lampBox(340, 515, 68, [['49QST1', p.qp[0].fail ? 'alm' : true], ['49QST1', p.qp[1].fail ? 'alm' : true]]) + lampBox(340, 557, 68, [['71QST1', F.gov_oil_leak ? 'alm' : true], ['71QST2', true], ['71QST3', true]]);
+    g += pump(518, 533, p.qp[0].run) + T(505, 537, '88QP1', 't tr') + pump(608, 533, p.qp[1].run) + T(595, 537, '88QP2', 't tr') + pump(742, 533, run && p.govOn, '', p.govOn ? C.red : C.wht) + T(785, 537, '88QP3', 't');
+    g += L(518, 524, 518, 470, 'ln') + vlv(518, 462, true) + L(518, 455, 518, 420, 'ln') + L(608, 524, 608, 470, 'ln') + vlv(608, 462, true) + L(608, 455, 608, 420, 'ln') + L(518, 490, 608, 490, 'ln') + `<path d="M540,486 l8,4 l-8,4 Z" fill="none" stroke="${C.wht}"/>` + vlv(565, 490);
+    g += L(518, 542, 518, 548, 'ln') + L(608, 542, 608, 548, 'ln') + L(742, 542, 742, 548, 'ln') + L(742, 524, 742, 475, 'ln');
+    [[285, 'A'], [315, 'B']].forEach(([x]) => { g += `<circle cx="${x}" cy="533" r="8" fill="none" stroke="${C.wht}"/>` + L(x - 6, 533, x + 6, 533, 'ln') + L(x, 525, x, 470, 'ln') + L(x, 541, x, 548, 'ln'); });
+    g += L(285, 470, 315, 470, 'ln') + `<circle cx="300" cy="455" r="7" fill="none" stroke="${C.wht}"/>` + L(300, 448, 300, 430, 'ln');
+    g += L(405, 470, 450, 470, 'ln') + `<circle cx="405" cy="463" r="7" fill="none" stroke="${C.wht}"/><circle cx="450" cy="463" r="7" fill="none" stroke="${C.wht}"/><circle cx="428" cy="485" r="7" fill="none" stroke="${C.wht}"/>` + L(428, 420, 428, 445, 'ln');
+    // cooler
+    g += `<circle cx="693" cy="475" r="11" fill="none" stroke="${C.wht}"/><path d="M684,481 Q693,462 702,481" fill="none" stroke="${C.wht}"/>` + L(704, 475, 900, 475, 'ln') + L(693, 486, 693, 493, 'ln') + L(693, 493, 900, 493, 'ln') + vlv(820, 448) + vlv(820, 493) + vlv(775, 493, false) + T(860, 444, 'COOLING WATER', 't') + T(860, 456, 'OUTLET', 't') + T(860, 489, 'COOLING WATER', 't') + T(860, 501, 'INLET', 't');
+    g += L(693, 464, 693, 448, 'ln') + L(693, 448, 900, 448, 'ln') + L(742, 475, 742, 448, '');
+    g += T(495, 632, 'Merah = solenoid energize / pompa jalan · hijau = pompa siaga / posisi AUTO. Tekanan tangki: % nominal (nilai MPa tidak ada di layar).', 'ts tc dim');
     return g;
   }
 
-  /* ============================== INLET VALVE HYDRAULIC ============================== */
+  /* ============================== INLET VALVE HYDRAULIC CONTROL SYSTEM (layar 00014) ============================== */
   function scrIVH(n) {
-    const u = U(n), p = u.p, F = u.fx, m = u.meas ? u.meas() : {}; let g = title(`NO.${n} INLET VALVE HYDRAULIC`) + backBtn();
-    const head = (P.intakeWL - 173.5);
-    g += L(40, 220, 330, 220, 'lnc') + L(40, 260, 330, 260, 'lnc') + T(120, 210, 'PENSTOCK', 't tc');
-    g += L(530, 220, 950, 220, p.iv > 0.02 || p.bypass > 0.02 ? 'lnc' : 'ln') + L(530, 260, 950, 260, p.iv > 0.02 || p.bypass > 0.02 ? 'lnc' : 'ln') + T(800, 210, 'SPIRAL CASE → TURBIN', 't tc');
-    // badan valve (rotary)
-    g += `<circle cx="430" cy="240" r="62" fill="none" stroke="#e8e8e8" stroke-width="2"/>`;
-    const ang = p.iv * 90; g += `<g transform="rotate(${ang} 430 240)"><rect x="424" y="182" width="12" height="116" fill="${p.iv > 0.995 ? '#ff2020' : p.iv < 0.005 ? '#18e018' : '#ffff40'}"/></g>`;
-    g += T(430, 330, `INLET VALVE ${f(p.iv * 100)} %`, 't tc cy');
-    // bypass
-    g += L(300, 220, 300, 140, 'ln') + L(300, 140, 560, 140, 'ln') + L(560, 140, 560, 220, 'ln');
-    g += `<rect x="415" y="128" width="30" height="24" fill="${p.bypass > 0.995 ? '#ff2020' : p.bypass < 0.005 ? '#18e018' : '#ffff40'}" stroke="#fff"/>` + T(430, 120, `BYPASS VALVE ${f(p.bypass * 100)} %`, 't tc');
-    // seal
-    g += R(500, 175, 14, 130, '', `fill="${p.seal > 0.99 ? '#ff2020' : p.seal < 0.02 ? '#18e018' : '#ffff40'}" opacity="0.55"`) + T(507, 318, 'OPE. SEAL', 'ts tc');
+    const u = U(n), p = u.p, F = u.fx, air = P.air ? P.air.u[n - 1] : { iv: 1 }; let g = title(`NO.${n} UNIT INLET VALVE HYDRAULIC CONTROL SYSTEM`) + backBtn();
+    const ivP = Math.min(1.02, 0.6 + 0.42 * air.iv), moving = (p.ivCmd === 'open' && p.iv < 0.995) || (p.ivCmd === 'close' && p.iv > 0.005) || (p.bypassCmd && p.bypass < 0.99);
+    g += mline(28, 112, 'from\nINLET\nVALVE\nAIR TANK', 't', 11) + L(85, 114, 210, 114, 'ln') + arrowR(100, 114) + vlv(110, 114) + sol(150, 114, ivP < 0.92) + T(145, 85, '20AJI', 't tc') + vlv(205, 114);
+    g += `<defs><linearGradient id="gTk2"><stop offset="0" stop-color="#555"/><stop offset=".5" stop-color="#ddd"/><stop offset="1" stop-color="#555"/></linearGradient><linearGradient id="gPipe" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#666"/><stop offset=".5" stop-color="#ddd"/><stop offset="1" stop-color="#666"/></linearGradient></defs>`;
+    g += `<rect x="215" y="78" width="47" height="62" rx="10" fill="url(#gTk2)" stroke="${C.wht}"/>` + T(238, 115, `${f(ivP * 100, 0)}%`, 'ts tc', 'style="fill:#000"') + relief(250, 78) + mline(208, 66, 'INLET VALVE\nPRESSURE TANK', 't tr', 11);
+    g += L(220, 140, 220, 148, 'ln') + L(255, 140, 255, 148, 'ln');
+    g += lampBox(313, 50, 67, [['71QVPA', true], ['71QVPL-1', ivP < 0.85 ? 'alm' : true], ['71QVPL-2', ivP < 0.75 ? 'alm' : true]]) + L(262, 85, 313, 85, 'ln');
+    g += lampBox(313, 112, 67, [['63QVH', ivP > 1.05 ? 'alm' : true], ['63QVL-1', ivP < 0.85 ? 'alm' : true], ['63QVL-2', ivP < 0.75 ? 'alm' : true]]) + L(262, 130, 313, 130, 'ln');
+    g += L(228, 148, 228, 545, 'ln') + vlv(228, 185, true) + L(255, 148, 255, 405, 'ln') + vlv(255, 185, true) + L(255, 405, 790, 405, 'ln');
+    // solenoid bypass & seal
+    g += mline(410, 100, 'BY-PASS VALVE\nOPEN/CLOSE\nSOLENOID VALVE', 't', 11) + sol(410, 140, p.bypassCmd, true) + T(432, 144, '20QIVBPI', 't');
+    g += mline(522, 90, 'SEAL CONTROL\nVALVE\nRELEASE/APPLY\nSOLENOID VALVE', 't', 11) + sol(520, 140, p.ivCmd === 'open' && p.seal < 0.995, true) + T(545, 144, '20QIVS1', 't');
+    g += L(405, 147, 405, 180, 'ln') + L(405, 180, 520, 180, 'ln') + L(520, 147, 520, 405, 'ln') + L(410, 132, 410, 50, 'ln') + L(410, 50, 860, 50, 'ln') + L(860, 50, 860, 168, 'ln');
+    g += L(520, 125, 520, 112, 'ln') + L(520, 112, 630, 112, 'ln') + L(630, 112, 630, 210, 'ln');
+    // seal loop dengan filter & valve
+    g += R(653, 70, 50, 90, 'boxd') + filt(676, 92) + filt(676, 138) + L(630, 112, 653, 112, 'ln') + L(703, 112, 755, 112, 'ln') + L(755, 112, 790, 112, 'ln') + vlv(790, 112) + L(796, 112, 860, 112, 'ln');
+    g += L(755, 112, 755, 210, 'ln') + vlv(755, 147, true) + L(820, 112, 820, 210, 'ln');
+    // badan valve & pipa
+    g += `<rect x="605" y="225" width="300" height="60" rx="8" fill="url(#gPipe)" stroke="#888"/><ellipse cx="790" cy="240" rx="55" ry="48" fill="url(#gPipe)" stroke="#888"/>`;
+    g += `<rect x="715" y="175" width="190" height="14" rx="6" fill="url(#gPipe)" stroke="#888"/><rect x="715" y="175" width="14" height="50" fill="url(#gPipe)" stroke="#888"/><rect x="891" y="175" width="14" height="50" fill="url(#gPipe)" stroke="#888"/>`;
+    const bpO = p.bypass > 0.02, ivO = p.iv > 0.02;
+    g += `<path d="M845,174 L845,190 L865,174 L865,190 Z" fill="${bpO ? C.red : C.grn}" stroke="#000"/>` + `<rect x="849" y="160" width="12" height="9" fill="${bpO ? C.red : C.grn}" stroke="#000"/>` + L(855, 169, 855, 174, 'ln');
+    g += `<g transform="rotate(${(1 - p.iv) * 90} 790 255)"><path d="M762,252 L818,252 L812,262 L768,262 Z" fill="${ivO ? C.red : C.grn}" stroke="#000"/></g>` + T(670, 248, 'FLOW', 't', 'style="fill:#000"') + `<path d="M670,256 L700,256 M694,252 L700,256 L694,260" stroke="#000" fill="none"/>`;
+    g += T(790, 215, `${f(p.iv * 100, 0)} %`, 'ts tc', 'style="fill:#000"');
+    // main valve solenoid
+    g += mline(795, 326, 'MAIN VALVE\nOPEN/CLOSE\nSOLENOID VALVE', 't', 11) + sol(790, 363, p.ivCmd === 'open', true) + T(818, 367, '20QIV', 't') + L(790, 290, 790, 345, 'ln') + L(790, 369, 790, 405, 'ln');
+    g += L(630, 210, 630, 225, 'ln');
+    // master solenoid & pompa
+    g += sol(473, 405, p.ivCmd === 'open' && !(u.lo['86-1'] || u.lo['86-2'])) + T(473, 375, '20QIVMSI', 't tc');
+    g += L(405, 405, 405, 430, 'ln') + L(270, 430, 448, 430, 'ln') + L(270, 430, 270, 548, 'ln') + L(448, 430, 448, 470, 'ln');
+    g += L(360, 430, 360, 524, 'ln') + vlv(360, 460, true) + L(345, 460, 345, 480, 'ln') + L(345, 480, 360, 480, 'ln') + L(450, 470, 450, 524, 'ln') + vlv(450, 460, true) + L(435, 460, 435, 480, 'ln') + L(435, 480, 450, 480, 'ln');
+    g += L(360, 505, 450, 505, 'ln') + `<path d="M380,501 l8,4 l-8,4 Z M425,501 l-8,4 l8,4 Z" fill="none" stroke="${C.wht}"/>` + L(405, 430, 405, 505, 'ln');
+    const pr = moving && !F.iv_stuck;
+    g += pump(362, 531, pr && p.ivPump !== 1, '88QVP1', undefined) + pump(452, 531, pr && p.ivPump === 1, '', undefined) + T(438, 535, '88QVP2', 't tr');
+    g += L(362, 540, 362, 548, 'ln') + L(452, 540, 452, 548, 'ln');
+    // pompa tangan & check valve (sekitar bypass)
+    g += `<circle cx="497" cy="270" r="9" fill="none" stroke="${C.wht}"/><circle cx="542" cy="270" r="9" fill="none" stroke="${C.wht}"/><circle cx="520" cy="292" r="8" fill="none" stroke="${C.wht}"/>` + L(488, 270, 506, 270, 'ln') + L(533, 270, 551, 270, 'ln') + L(497, 240, 542, 240, 'ln') + vlv(497, 252, true) + vlv(542, 252, true);
+    g += lampBox(497, 508, 63, [['49QIV1', true], ['49QIV2', true]]) + lampBox(497, 553, 63, [['71QIV6', true], ['71QIV7', true], ['71QIV8', true]]);
+    g += R(180, 548, 410, 62, '', `fill="${C.brn}" stroke="${C.wht}"`) + T(322, 601, 'OIL SUMP TANK FOR INLET VALVE', 't tc');
     // nilai
-    const rows = [['Tekanan penstock', `${f(head * 0.0981, 1)} bar`], ['Tekanan spiral case', `${f(head * 0.0981 * (1 - p.dp * (p.iv < 0.01 ? 1 : 0)), 1)} bar`], ['Selisih tekanan (ΔP) I/V', `${f(p.dp * 100)} %`],
-      ['Perintah I/V (21S)', p.ivCmd === 'open' ? 'OPEN' : 'CLOSE'], ['Rem generator', p.brake > 0.5 ? 'APPLY' : 'RELEASE'], ['Debit turbin', `${f(m.flow || 0, 1)} m³/s`]];
-    rows.forEach(([a, b], i) => { g += T(40, 380 + i * 18, a, 't') + T(330, 380 + i * 18, b, 't tr cy'); });
-    const lamps = [['33IVha I/V FULLY OPEN (DI0169)', p.iv > 0.995], ['33IVlb I/V FULLY CLOSE (DI0168)', p.iv < 0.005], ['33BPha BYPASS FULLY OPEN (DI0171)', p.bypass > 0.995],
-      ['33BPlb BYPASS FULLY CLOSE (DI0170)', p.bypass < 0.005], ['OPERATING SEAL APPLIED (DI0174)', p.seal > 0.99], ['OPERATING SEAL RETRACTED', p.seal < 0.02],
-      ['63WC SPIRAL CASE PRESSURE (DI0176)', p.dp < 0.05 || p.iv > 0.01], ['88QVP I/V OIL PUMP RUN', (p.ivCmd === 'open' && p.iv < 0.995) || (p.ivCmd === 'close' && p.iv > 0.005)],
-      ['33IVL I/V LOCKED', !!F.gv_locked], ['I/V QUICK SHUTDOWN (86-1/86-2)', !!(u.lo['86-1'] || u.lo['86-2'])], ['I/V MACET (skenario)', !!F.iv_stuck], ['BYPASS MACET (skenario)', !!F.bypass_stuck]];
-    lamps.forEach(([s, on], i) => { const x = 620, y = 365 + i * 20; g += lamp(x, y, on) + T(x + 14, y + 4, s, 't'); });
-    g += mline(330, 610, 'Tekanan dihitung dari head (WL intake − 173.5 m tailrace). Tekanan & level tangki oli I/V tidak dimodelkan (data tidak tersedia).', 't tc dim', 13);
+    const head = P.intakeWL - 173.5;
+    g += R(640, 440, 330, 120, 'boxd') + [['PENSTOCK PRESSURE', `${f(head * 0.967 + 0.5)} mWC`], ['SPIRAL CASE PRESSURE', `${f(head * (1 - p.dp * (p.iv < 0.01 ? 1 : 0)) * 0.97)} mWC`],
+      ['I/V ΔP (DIFFERENTIAL)', `${f(p.dp * 100)} %`], ['INLET VALVE', p.iv > 0.995 ? 'FULLY OPEN' : p.iv < 0.005 ? 'FULLY CLOSE' : `${f(p.iv * 100)} %`], ['BY-PASS VALVE', p.bypass > 0.995 ? 'FULLY OPEN' : p.bypass < 0.005 ? 'FULLY CLOSE' : `${f(p.bypass * 100)} %`],
+      ['OPERATING SEAL', p.seal > 0.99 ? 'APPLIED' : p.seal < 0.02 ? 'RELEASED' : 'BERGERAK']].map(([a, b], i) => T(650, 458 + i * 17, a, 't') + T(960, 458 + i * 17, b, 't tr cy')).join('');
+    g += T(495, 632, 'Merah = valve terbuka / solenoid energize · hijau = valve tertutup. Nilai tekanan simulator (head intake − tailrace 173.5 m).', 'ts tc dim');
+    return g;
+  }
+
+  /* ============================== AIR SUPPLY SYSTEM (layar 00010) ============================== */
+  function scrAir() {
+    const air = AIR(); let g = title('AIR SUPPLY SYSTEM') + backBtn();
+    const comp = (x, y, c) => `<g data-a="x:airc"><circle cx="${x}" cy="${y}" r="9" fill="none" stroke="${c.fail ? C.red : c.run ? C.yel : C.wht}" stroke-width="1.6"/><path d="M${x - 4},${y - 4} L${x + 5},${y} L${x - 4},${y + 4}" fill="none" stroke="${c.fail ? C.red : c.run ? C.yel : C.wht}"/></g>`;
+    const pv = (x, y, v) => T(x, y, `${f(v * 100, 0)} %`, 'ts tc', `style="fill:${v < 0.8 ? '#ff6060' : C.cy}"`);
+    [0, 1, 2].forEach((i) => {
+      const a = air.u[i], y = 114 + i * 94.5, n = i + 1, s1 = air.sw(a.prim), sb = air.sw(a.brake);
+      g += T(17, y - 20, 'AIR COMPRESSOR 1', 't') + T(17, y, `UNIT NO.${n}`, 't') + comp(88, y, a.c1) + L(97, y, 260, y, 'ln') + vlv(116, y);
+      g += lampBox(180, y - 57, 67, [['63AQH1', s1.H1 ? true : 'alm'], ['63AQH2', s1.H2]]);
+      g += ptank(260, y - 47, 56, 54, `PRIMARY\nAIR\nTANK\n#${n}`) + relief(290, y - 47) + pv(288, y + 18, a.prim);
+      g += L(316, y - 36, 345, y - 36, 'ln') + filt(355, y - 36) + L(363, y - 36, 378, y - 36, 'ln') + arrowR(378, y - 36) + mline(382, y - 33, `to GOVERNOR PRESSURE\nTANK (UNIT NO.${n})`, 't', 11);
+      g += L(316, y, 640, y, 'ln') + vlv(398, y) + filt(432, y) + `<path d="M464,${y - 5} L476,${y} L464,${y + 5} Z" fill="none" stroke="${C.wht}"/>` + L(455, y, 455, y - 14, 'ln') + L(455, y - 14, 490, y - 14, 'ln') + L(490, y - 14, 490, y, 'ln') + vlv(510, y) + vlv(610, y);
+      g += lampBox(567, y - 49, 64, [['63AQL', sb.L ? 'alm' : true]]);
+      g += ptank(640, y - 47, 60, 54, `BRAKE\nAIR\nTANK\n#${n}`) + relief(680, y - 47) + relief(718, y - 30) + pv(670, y + 18, a.brake);
+      g += L(700, y - 22, 812, y - 22, 'ln') + vlv(708, y - 22) + L(745, y - 22, 745, y - 36, 'ln') + L(745, y - 36, 772, y - 36, 'ln') + L(772, y - 36, 772, y - 22, 'ln') + vlv(788, y - 22) + arrowR(812, y - 22) + mline(814, y - 25, `to MAINTENANCE\nSHAFT SEAL (UNIT NO.${n})`, 't', 11);
+      g += L(700, y, 812, y, 'ln') + vlv(708, y) + vlv(788, y) + relief(795, y) + arrowR(812, y) + mline(814, y + 3, `to HYDRAULIC TURBINE\nACTUATOR (UNIT NO.${n})`, 't', 11);
+      // kompresor 2 – inlet valve air tank
+      const y2 = 403 + i * 94.5, s2 = air.sw(a.iv);
+      g += T(17, y2 - 20, 'AIR COMPRESSOR 2', 't') + T(17, y2, `UNIT NO.${n}`, 't') + comp(88, y2, a.c2) + L(97, y2, 260, y2, 'ln') + vlv(116, y2);
+      g += lampBox(180, y2 - 57, 67, [['63AQH1', s2.H1 ? true : 'alm'], ['63AQH2', s2.H2]]);
+      g += ptank(260, y2 - 47, 56, 54, `INLET\nVALVE\nAIR TANK\n#${n}`) + relief(290, y2 - 47) + pv(288, y2 + 18, a.iv);
+      g += L(316, y2 - 36, 355, y2 - 36, 'ln') + filt(365, y2 - 36) + L(373, y2 - 36, 388, y2 - 36, 'ln') + arrowR(388, y2 - 36) + mline(392, y2 - 33, `to INLET VALVE\nPRESSURE TANK (UNIT NO.${n})`, 't', 11);
+      if (i < 2) {
+        [[135, y, y + 94.5], [162, y, y + 94.5], [528, y, y + 94.5], [555, y, y + 94.5], [135, y2, y2 + 94.5], [162, y2, y2 + 94.5]].forEach(([x, a0, a1]) => { g += L(x, a0, x, a1, 'ln') + vlv(x, (a0 + a1) / 2, true); });
+      }
+    });
+    g += L(135, 114, 135, 114, '') + T(495, 638, 'Kuning = kompresor jalan, merah = gangguan. Persentase = tekanan tangki terhadap nominal (simulator); kompresor start bila 63AQH1 OFF, stop saat 63AQH2 ON.', 'ts tc dim');
+    return g;
+  }
+
+  /* ============================== RAIN FALL MONITOR (layar 00023) ============================== */
+  const RN = { C: [527, 295], D: [460, 320], E: [555, 335], F: [440, 385], G: [485, 450], H: [570, 430] };
+  const RPOLY = [
+    { c: '#8a8a00', p: [[335, 235], [370, 195], [440, 185], [460, 130], [497, 75], [565, 117], RN.C, RN.D, [400, 285]] },
+    { c: '#b8ebb8', p: [[565, 117], [590, 150], [640, 147], [680, 185], [690, 265], [705, 315], [698, 350], RN.E, RN.C] },
+    { c: '#ffc800', p: [RN.E, [698, 350], [712, 370], [700, 445], [640, 475], [570, 485], [540, 525], RN.H] },
+    { c: '#ffd0a8', p: [RN.D, RN.C, RN.E, RN.H, RN.G, RN.F] },
+    { c: '#f2e6a0', p: [RN.F, RN.G, RN.H, [540, 525], [520, 575], [450, 575], [380, 545], [355, 495], [355, 440], [380, 400]] },
+    { c: '#ff99cc', p: [[335, 235], [400, 285], RN.D, RN.F, [380, 400], [320, 355], [270, 305], [260, 265]] },
+  ];
+  const RIV = [[[497, 90], [500, 140], [490, 200], [500, 260], [515, 300], [520, 360], [500, 420], [490, 480], [470, 540], [445, 575], [430, 590], [380, 600], [330, 598]],
+    [[640, 160], [600, 210], [560, 260], [527, 300]], [[690, 300], [640, 320], [590, 335], [555, 345], [520, 360]], [[690, 410], [640, 420], [590, 430], [540, 440], [500, 450]],
+    [[300, 290], [350, 310], [410, 330], [460, 345], [510, 360]], [[370, 470], [420, 470], [470, 480]], [[410, 210], [440, 250], [470, 285], [500, 320]], [[640, 240], [600, 270], [560, 300]],
+    [[620, 380], [580, 395], [540, 410]], [[360, 520], [410, 515], [460, 520]]];
+  function scrRain() {
+    const rn = RAIN(); let g = title('RAIN FALL MONITOR') + backBtn();
+    for (const s of RPOLY) g += `<polygon points="${s.p.map((q) => q.join(',')).join(' ')}" fill="${s.c}" stroke="#000" stroke-width=".8"/>`;
+    for (const k of [[[527, 295], [460, 320], [440, 385]], [[527, 295], [555, 335], [698, 350]], [[460, 320], [400, 285], [335, 235]], [[527, 295], [565, 117]], [[555, 335], [570, 430], [485, 450], [440, 385]], [[570, 430], [540, 525]]]) g += `<polyline points="${k.map((q) => q.join(',')).join(' ')}" fill="none" stroke="#000" stroke-dasharray="3 3"/>`;
+    for (const r of RIV) g += `<polyline points="${r.map((q) => q.join(',')).join(' ')}" fill="none" stroke="#18b8ff" stroke-width="${r === RIV[0] ? 2 : 1.2}"/>`;
+    for (let k = 0; k < 40; k++) { const x = 300 + (k * 97) % 400, y = 140 + (k * 61) % 420; g += `<path d="M${x},${y} q6,8 2,16 q-4,6 3,12" fill="none" stroke="#18b8ff" stroke-width=".8"/>`; }
+    g += `<rect x="342" y="590" width="8" height="12" fill="none" stroke="#fff"/><path d="M425,560 l8,-10 l8,10" fill="none" stroke="#fff"/>`;
+    const box = (x, y, lab, val, unit) => T(x + 3, y - 4, lab, 't', 'style="fill:#222;font-weight:bold"') + R(x, y, 62, 32, '', 'fill="#000" stroke="#fff"') + T(x + 50, y + 13, val, 't tr') + T(x + 58, y + 27, unit, 't tr');
+    const v = (i) => f(rn.rgs[i], 1);
+    g += box(435, 220, 'RGS-1', v(0), 'mm/h') + box(594, 250, 'RGS-2', v(1), 'mm/h') + box(337, 283, 'RGS-6', v(5), 'mm/h') + box(465, 345, 'RGS-4', v(3), 'mm/h');
+    g += box(594, 378, 'RGS-3', v(2), 'mm/h') + box(495, 409, 'WLS-1', f(rn.wls(0), 2), 'Elm') + box(337, 442, 'RGS-5', v(4), 'mm/h') + box(402, 508, 'WLS-2', f(rn.wls(1), 2), 'Elm');
+    // panel instruktur
+    g += R(760, 50, 215, 250, 'boxd') + T(867, 68, 'INSTRUKTUR: HUJAN DAS', 't tc cy');
+    [0, 5, 10, 20, 40].forEach((I, k) => { g += b3(772 + (k % 3) * 66, 80 + Math.floor(k / 3) * 30, 62, 24, `${I} mm/h`, rn.I === I ? 'yel' : '', `x:rain:${I}`); });
+    g += T(772, 155, `Intensitas set: ${f(rn.I, 0)} mm/h`, 't') + T(772, 172, `Tambahan inflow: ${f(rn.q, 1)} m³/s`, 't') + T(772, 189, `Inflow intake: ${f(P.inflow, 1)} m³/s`, 't');
+    g += T(772, 210, 'Curah hujan kumulatif (mm):', 't') + rn.acc.map((a, i) => T(772 + (i % 3) * 66, 227 + Math.floor(i / 3) * 16, `R${i + 1} ${f(a, 1)}`, 'ts cy')).join('');
+    g += mline(867, 275, 'Data sintetis: di OPS nilai = "?"\n(tidak terkomunikasi). Limpasan &\nrating curve WLS = asumsi.', 'ts tc dim', 11);
+    return g;
+  }
+
+  /* ============================== ANALOG INPUT SY / USS / MSS (layar 00086 / 00084 / 00085) ============================== */
+  function aiScreen(ttl, pre, ai, rtd) {
+    let g = title(ttl) + backBtn() + T(495, 36, '---  4-20mA CURRENT INPUT  ---', 't tc');
+    const RH = 18, sp = ['SPARE', '0', ''];
+    const full = (a, n) => { const r = a.slice(); while (r.length < n) r.push(sp); return r; };
+    const A = full(ai, 46), Rt = full(rtd, 16);
+    const row = (x, y, tag, r) => R(x, y, 60, RH, 'box') + T(x + 3, y + 13, tag, 'ts') + R(x + 60, y, 282, RH, 'box') + T(x + 64, y + 13, r[0], 'ts') + R(x + 352, y, 106, RH, 'box') +
+      T(x + 412, y + 13, r[1], 'ts tr') + T(x + 418, y + 13, r[2], 'ts');
+    for (let i = 0; i < 23; i++) { g += row(10, 42 + i * RH, `${pre}AI${String(i + 1).padStart(4, '0')}`, A[i]) + row(483, 42 + i * RH, `${pre}AI${String(i + 24).padStart(4, '0')}`, A[i + 23]); }
+    g += T(495, 469, '---  RTD INPUT  ---', 't tc');
+    for (let i = 0; i < 8; i++) { g += row(10, 474 + i * RH, `${pre}RTD${String(i + 1).padStart(4, '0')}`, Rt[i]) + row(483, 474 + i * RH, `${pre}RTD${String(i + 9).padStart(4, '0')}`, Rt[i + 8]); }
+    return g;
+  }
+  const v1 = (x, d = 1) => f(x, d);
+  function aiSY() {
+    const sy = P.sy, fl = sy.flows(), lv = sy.busLive(), ss = SS();
+    const Iline = (p, q) => Math.hypot(p, q) * 1000 / (Math.sqrt(3) * 154);
+    const ph = (I, k) => v1(I * [1.0, 1.008, 1.04][k], 0);
+    const unitI = (n) => { const u = U(n); return u.p.cb && sy.unitOnGrid(n) ? Iline(u.p.p, u.p.q) : 0; };
+    const lstI = ss.kw('252-LS') / (Math.sqrt(3) * 154 * 0.88), lstT = 38 + 0.02 * ss.kw('252-LS') / 10;
+    const ai = [['TRANSMISSION LINE NO.1 ACTIVE POWER', v1(fl.L1.p), 'MW'], ['TRANSMISSION LINE NO.1 REACTIVE POWER', v1(fl.L1.q), 'MVar'],
+      ...[0, 1, 2].map((k) => [`TRANSMISSION LINE NO.1 CURRENT PHASE ${'RST'[k]}`, ph(Iline(fl.L1.p, fl.L1.q), k), 'A']),
+      ['TRANSMISSION LINE NO.2 ACTIVE POWER', v1(fl.L2.p), 'MW'], ['TRANSMISSION LINE NO.2 REACTIVE POWER', v1(fl.L2.q), 'MVar'],
+      ...[0, 1, 2].map((k) => [`TRANSMISSION LINE NO.2 CURRENT PHASE ${'RST'[k]}`, ph(Iline(fl.L2.p, fl.L2.q), k), 'A']),
+      ['150KV BUS-A VOLTAGE', lv.A ? v1(154.9) : '0.0', 'kV'], ['150KV BUS-A FREQUENCY', lv.A ? v1(sy.freq) : '0.0', 'Hz'], ['150KV BUS-B VOLTAGE', lv.B ? v1(154.6) : '0.0', 'kV'], ['150KV BUS-B FREQUENCY', lv.B ? v1(sy.freq) : '0.0', 'Hz'],
+      ...[0, 1, 2].map((k) => [`150KV BUS-TIE CURRENT PHASE ${'RST'[k]}`, ph(fl.BT, k), 'A']),
+      ...[1, 2, 3].flatMap((n) => [0, 1, 2].map((k) => [`150KV MTR. UNIT NO.${n} CURRENT PHASE ${'RST'[k]}`, v1(unitI(n) * [1, 0.98, 1.02][k]), 'A'])),
+      ...[0, 1, 2].map((k) => [`LSTR. CURRENT PHASE ${'RST'[k]}`, v1(lstI * [1, 1.05, 0.95][k]), 'A']), ['LSTR. TAP POSITION', String(sy.tap), ''], ['OUTDOOR SWITCHYARD AMBIENT TEMPERATURE', '32', '℃']];
+    const rtd = [['SPARE', '0', ''], ['LSTR. WINDING TEMPERATURE', v1(lstT + 1.5), '℃'], ['LSTR. OIL TEMPERATURE', v1(lstT + 2.3), '℃']];
+    return aiScreen('ANALOG INPUT FOR SWITCHYARD', 6, ai, rtd);
+  }
+  function aiUSS() {
+    const ss = SS(), kw = (id) => v1(ss.kw(id)), a = (id) => v1(ss.amps(id)), na = (n) => v1(ss.nodeAmps(n)), V = (n) => v1(ss.volt(n));
+    const u = (n) => [[`USTR.${n} ACTIVE POWER`, kw('452-' + n), 'kW'], [`USTR.${n} CURRENT`, a('452-' + n), 'A'], [`UNIT NO.${n} 400V BUS VOLTAGE`, V('UB' + n), 'V'], [`UNIT NO.${n} MCC${n}A CURRENT`, na(`MCC${n}A`), 'A'], [`UNIT NO.${n} MCC${n}B CURRENT`, na(`MCC${n}B`), 'A']];
+    const zp = (k) => (ss.live[`SST${k}P`] ? '0.1' : '0.0');
+    const ai = [...u(3), ...u(2), ...u(1), ['SPARE', '0', ''],
+      ['SSTR.1 ACTIVE POWER', kw('252-L1'), 'kW'], ['SSTR.1 VOLTAGE', V('SST1P'), 'kV'], ['SSTR.1 CURRENT', f(ss.amps('252-L1'), 2), 'A'], ['SSTR.1 ZERO-PHASE VOLTAGE', zp(1).replace('0.1', '0.0'), 'V'],
+      ['SSTR.2 ACTIVE POWER', kw('252-L2'), 'kW'], ['SSTR.2 VOLTAGE', V('SST2P'), 'kV'], ['SSTR.2 CURRENT', f(ss.amps('252-L2'), 2), 'A'], ['SSTR.2 ZERO-PHASE VOLTAGE', zp(2), 'V'],
+      ['400V BUS-A ACTIVE POWER', v1(ss.nodeKW.P4A || 0), 'kW'], ['400V BUS-A VOLTAGE', V('P4A'), 'V'], ['400V BUS-A CURRENT', v1(ss.nodeAmps('P4A'), 0), 'A'],
+      ['400V BUS-B ACTIVE POWER', v1(ss.nodeKW.P4B || 0), 'kW'], ['400V BUS-B VOLTAGE', V('P4B'), 'V'], ['400V BUS-B CURRENT', v1(ss.nodeAmps('P4B'), 0), 'A'], ['SPARE', '0', ''], ['SPARE', '0', ''],
+      ['400V BUS-TIE 352B-A1 CURRENT', a('352B-A1'), 'A'], ['400V BUS-TIE 352B-A2 CURRENT', a('352B-A2'), 'A'], ['400V BUS-TIE 352B-B1 CURRENT', a('352B-B1'), 'A'], ['400V BUS-TIE 352B-B2 CURRENT', a('352B-B2'), 'A'],
+      ['COMMON MCC CURRENT', a('352-4'), 'A'], ['TAILRACE WATER LEVEL', f(173.41, 2), 'Elm']];
+    const rtd = [['USTR.1 WINDING TEMPERATURE', v1(ss.ustT[1]), '℃'], ['USTR.2 WINDING TEMPERATURE', v1(ss.ustT[2]), '℃'], ['USTR.3 WINDING TEMPERATURE', v1(ss.ustT[3]), '℃'], ['UNDERGROUND POWERHOUSE AMBIENT TEMPERATURE', '?', '℃']];
+    return aiScreen('ANALOG INPUT FOR UNDERGROUND STATION SERVICE', 4, ai, rtd);
+  }
+  function aiMSS() {
+    const ss = SS(), dg = ss.dg, mw = (id) => f(ss.kw(id) / 1000, 2), kw = (id) => v1(ss.kw(id)), a = (id) => v1(ss.amps(id)), V = (n) => v1(ss.volt(n));
+    const ai = [['20KV LSTR. ACTIVE POWER', mw('252-LS'), 'MW'], ['20KV LSTR. CURRENT', a('252-LS'), 'A'], ['20KV DL-BC ACTIVE POWER', mw('252DL-BC'), 'MW'], ['20KV DL-BC CURRENT', a('252DL-BC'), 'A'],
+      ['20KV DL-ID ACTIVE POWER', mw('252DL-ID'), 'MW'], ['20KV DL-ID CURRENT', a('252DL-ID'), 'A'], ['20KV DL-RD ACTIVE POWER', mw('252DL-RD'), 'MW'], ['20KV DL-RD CURRENT', a('252DL-RD'), 'A'],
+      ['20KV SSTR.1 ACTIVE POWER', kw('252B-A2'), 'kW'], ['20KV SSTR.1 CURRENT', a('252B-A2'), 'A'], ['20KV SSTR.2 ACTIVE POWER', kw('252B-B2'), 'kW'], ['20KV SSTR.2 CURRENT', a('252B-B2'), 'A'],
+      ['20KV SSTR.3 CURRENT', a('252B-A1'), 'A'], ['20KV SSTR.4 CURRENT', a('252B-B1'), 'A'], ['400V BUS-A ACTIVE POWER', kw('352-S1'), 'kW'], ['400V BUS-A CURRENT', v1(ss.amps('352-S1'), 0), 'A'],
+      ['400V BUS-B ACTIVE POWER', kw('352-S2'), 'kW'], ['400V BUS-B CURRENT', v1(ss.amps('352-S2'), 0), 'A'], ['400V BUS-TIE (352B-A3) CURRENT', a('352B-A3'), 'A'], ['400V BUS-TIE (352B-A4) CURRENT', a('352B-A4'), 'A'],
+      ['400V BUS-TIE (352B-B3) CURRENT', a('352B-B3'), 'A'], ['400V BUS-TIE (352B-B4) CURRENT', a('352B-B4'), 'A'], ['20KV BUS-A VOLTAGE', V('M20A'), 'kV'], ['20KV BUS-B VOLTAGE', V('M20B'), 'kV'],
+      ['400V BUS-A VOLTAGE', v1(ss.volt('M4A'), 1), 'V'], ['400V BUS-B VOLTAGE', v1(ss.volt('M4B'), 1), 'V'], ['DG ACTIVE POWER', v1(dg.kw), 'kW'], ['DG VOLTAGE', v1(dg.v), 'V'], ['DG CURRENT', a('52DG'), 'A'], ['DG FREQUENCY', v1(dg.run ? dg.f : 45.0), 'Hz']];
+    return aiScreen('ANALOG INPUT FOR MAIN CONTROL ROOM STATION SERVICE', 5, ai, [['MAIN CONTROL ROOM AMBIENT TEMPERATURE', '?', '℃']]);
+  }
+
+  /* ============================== DAILY POWER OPERATION (layar 00096) ============================== */
+  function scrDPO() {
+    const pc = PC(), d = pc.dpo, r = d.res, dam = DAM(); let g = title('DAILY POWER OPERATION') + backBtn();
+    const ib = (x, y, w, val, act) => `<g ${act ? `data-a="${act}"` : ''}>${R(x, y, w, 21, '', `fill="${act ? '#a0a0a0' : '#000'}" stroke="#ddd"`)}${T(x + w - 4, y + 15, val, 't tr', act ? 'style="fill:#000"' : '')}</g>`;
+    g += R(151, 44, 323, 113, 'box') + T(155, 57, 'CALCULATION PARAMETER', 't');
+    g += T(155, 81, 'INFLOW', 't') + ib(225, 67, 46, f(d.inflow, 2), 'x:dpo:inflow') + T(276, 81, '[m3/sec]', 't') + T(330, 81, 'BIAS', 't') + ib(370, 67, 50, f(d.bias, 2), 'x:dpo:bias') + T(424, 81, '[m3/sec]', 't');
+    g += mline(155, 106, 'GENERATING\nPOWER', 't', 11) + ib(226, 93, 46, f(d.P, 0), 'x:dpo:P') + T(276, 108, '[MW]', 't') + T(305, 108, 'START TIME', 't') + ib(370, 93, 50, f(d.start, 0), 'x:dpo:start') + T(424, 108, ':00', 't');
+    g += T(173, 138, 'NEXT START TIME SCHEDULE : AFTER', 't') + ib(370, 123, 50, f(d.next, 0), 'x:dpo:next') + T(424, 138, '[Hr]', 't');
+    g += b3(482, 65, 82, 27, 'CALCULATION', '', 'x:dpo:calc') + b3(482, 100, 82, 22, 'UKUR INFLOW', '', 'x:dpo:meas');
+    g += R(570, 44, 300, 113, 'box') + T(577, 57, 'CALCULATION RESULT', 't');
+    const hh = (x) => String(Math.floor(x)).padStart(2, '0');
+    g += T(577, 81, 'INFLOW', 't') + ib(640, 67, 46, r ? f(r.inflow, 2) : '', '') + T(690, 81, '[m3/sec]', 't');
+    g += mline(577, 106, 'GENERATING\nPOWER', 't', 11) + ib(640, 93, 46, r ? f(r.P, 0) : '', '') + T(690, 108, '[MW]', 't') + mline(757, 106, 'AVAILABLE\nPERIOD', 't tc', 11) + ib(791, 93, 50, r ? (r.period >= 24 ? '>24' : f(r.period, 1)) : '', '') + T(845, 108, '[Hr]', 't');
+    g += T(627, 138, 'POWER GENERATION STOP TIME', 't') + ib(791, 123, 50, r ? (r.period >= 24 ? '--' : hh(r.stop)) : '', '') + T(845, 138, ':00', 't');
+    g += R(878, 143, 55, 17, 'box');
+    // nilai terakhir
+    const tot = pc.totals();
+    g += T(85, 95, 'LATEST VALUE', 't tc') + mline(36, 120, 'GENERATING\nPOWER', 't tc', 11) + T(108, 125, 'WATER LEVEL', 't tc') + R(10, 144, 54, 20, 'box') + T(60, 158, f(tot.p, 0), 't tr') + R(81, 144, 54, 20, 'box') + T(131, 158, f(P.intakeWL, 2), 't tr');
+    // grafik 48 jam
+    const X0 = 150, X1 = 890, Y0 = 183, Y1 = 465, xn = (X0 + X1) / 2, pxh = (X1 - X0) / 48;
+    const yW = (w) => Y1 - (w - 575) / 5 * (Y1 - Y0), yP = (p) => Y1 - p / 250 * (Y1 - Y0), yR = (w) => 325 + (157 - w) / 5 * 70;
+    g += T(36, 177, '[MW]', 't tc') + T(108, 177, '[Elm]', 't tc') + T(916, 177, '[Elm]', 't tc');
+    [[250, 0], [200, 0], [100, 0], [0, 0]].forEach(([v]) => { g += T(25, yP(v) + 4, v, 't tc'); });
+    [580.0, 579.1, 578.0, 577.0, 576.0, 575.0].forEach((v) => { g += T(112, yW(v) + 4, f(v, 1), 't tr'); });
+    [157, 152, 147].forEach((v) => { g += T(935, yR(v) + 4, v, 't'); });
+    g += R(36, Y0, 20, Y1 - Y0, 'box') + `<rect x="37" y="${yP(tot.p)}" width="18" height="${Y1 - yP(tot.p)}" fill="#ff9a10"/>` + R(118, Y0, 20, Y1 - Y0, 'box') + `<rect x="119" y="${yW(P.intakeWL)}" width="18" height="${Y1 - yW(P.intakeWL)}" fill="#22b8e8"/>`;
+    g += R(900, Y0, 18, Y1 - Y0, 'box') + `<rect x="901" y="${Math.max(Y0, yR(dam.rwl))}" width="16" height="${Y1 - Math.max(Y0, yR(dam.rwl))}" fill="#22b8e8"/>`;
+    g += R(X0, Y0, X1 - X0, Y1 - Y0, 'box');
+    for (let k = 1; k < 8; k++) g += L(X0 + k * 6 * pxh, Y0, X0 + k * 6 * pxh, Y1, 'ln');
+    const tod = pc.tod() / 3600;
+    for (let k = 0; k <= 8; k++) { const h = ((tod - 24 + k * 6) % 24 + 24) % 24; g += T(X0 + k * 6 * pxh, Y1 + 18, `${Math.floor(h)} :${String(Math.round((h % 1) * 60)).padStart(2, '0')}`, 't tc'); }
+    g += `<line x1="${X0 - 20}" x2="${X1}" y1="${yW(579.1)}" y2="${yW(579.1)}" stroke="#ddd" stroke-dasharray="2 3"/>` + T(126, yW(579.1) - 4, 'FSL', 't');
+    g += `<line x1="${X0 - 20}" x2="${X1}" y1="${yW(578.2)}" y2="${yW(578.2)}" stroke="#ddd" stroke-dasharray="2 3"/>` + T(126, yW(578.2) - 4, 'MOL', 't');
+    g += `<line x1="${X0}" x2="${X1 + 10}" y1="${yR(157.5)}" y2="${yR(157.5)}" stroke="#ddd" stroke-dasharray="2 3"/>` + T(872, yR(157.5) - 4, 'HWL', 't');
+    // riwayat 24 jam
+    const hs = pc.hist.concat([{ t: P.t, p: tot.p, wl: P.intakeWL }]);
+    const xt = (t) => xn - (P.t - t) / 3600 * pxh;
+    const ptsP = hs.filter((h) => xt(h.t) >= X0).map((h) => `${xt(h.t).toFixed(1)},${yP(h.p).toFixed(1)}`), ptsW = hs.filter((h) => xt(h.t) >= X0).map((h) => `${xt(h.t).toFixed(1)},${yW(h.wl).toFixed(1)}`);
+    if (ptsP.length > 1) g += `<polyline points="${ptsP.join(' ')}" fill="none" stroke="#ff9a10" stroke-width="1.6"/><polyline points="${ptsW.join(' ')}" fill="none" stroke="#22c8f0" stroke-width="1.6"/>`;
+    // prakiraan
+    if (r && r.fc) {
+      const off = (P.t - r.at) / 3600;
+      const fx = r.fc.map((q) => [xn + (q.h - off) * pxh, q]).filter(([x]) => x >= xn - 1 && x <= X1);
+      g += `<polyline points="${fx.map(([x, q]) => `${x.toFixed(1)},${yP(q.p).toFixed(1)}`).join(' ')}" fill="none" stroke="#ff9a10" stroke-dasharray="3 2"/><polyline points="${fx.map(([x, q]) => `${x.toFixed(1)},${yW(q.wl).toFixed(1)}`).join(' ')}" fill="none" stroke="#22c8f0" stroke-dasharray="3 2"/>`;
+    }
+    g += L(xn, Y0, xn, Y1, '') + `<line x1="${xn}" y1="${Y0}" x2="${xn}" y2="${Y1}" stroke="#ff2020" stroke-width="2.5"/>`;
+    // tabel
+    const pv = pc.planned();
+    const rows = [['GENERATING POWER', f(tot.p, 0), pv ? f(pv.p, 0) : '', pv ? f(tot.p - pv.p, 0) : '', '[MW]'], ['WATER LEVEL', f(P.intakeWL, 2), pv ? f(pv.wl, 2) : '', pv ? f(P.intakeWL - pv.wl, 2) : '', '[Elm]'], ['RE-DAM WATER LEVEL', f(dam.rwl, 2), dam ? f(dam.plannedRWL, 2) : '', f(dam.rwl - dam.plannedRWL, 2), '[Elm]']];
+    g += R(190, 495, 463, 120, 'box') + L(316, 495, 316, 615, 'ln') + L(428, 495, 428, 615, 'ln') + L(541, 495, 541, 615, 'ln') + L(190, 530, 653, 530, 'ln');
+    g += T(372, 516, 'LATEST VALUE', 't tc') + mline(484, 512, 'PLANED VALUE OF\n(PRESENT TIME)', 't tc', 11) + T(597, 516, 'DIFFERENTIAL', 't tc');
+    rows.forEach((rw, i) => { const y = 530 + i * 28; g += T(195, y + 18, rw[0], 't'); [[322, rw[1]], [434, rw[2]], [547, rw[3]]].forEach(([x, v]) => { g += R(x, y + 5, 55, 19, 'box') + T(x + 51, y + 19, v, 't tr') + T(x + 60, y + 19, rw[4], 't'); }); });
+    g += mline(820, 555, 'Garis putus-putus = prakiraan hasil CALCULATION.\nAlgoritma: neraca volume intake (kurva f7),\nQ turbin 0.30 m³/s per MW, MOL 578.2 m (dibaca\ndari grafik) – ASUMSI, layar asli tidak\nmencantumkan rumus.', 'ts tc dim', 11);
+    return g;
+  }
+
+  /* ============================== UNIT DAILY OPERATION SCHEDULE (layar 00031–00035) ============================== */
+  const SCH_NAV = (cur) => navRow([['SWITCHYARD/\nSTATION SERVICE\nCONTROL PANEL', 'nav:ssc'], ['SCHEDULE\nRAINY/WEEKDAY', 'nav:sch1'], ['SCHEDULE\nRAINY/WEEKEND', 'nav:sch2'], ['SCHEDULE\nDRY/WEEKDAY', 'nav:sch3'], ['SCHEDULE\nDRY/WEEKEND', 'nav:sch4'], ['SCHEDULE\nARBITRARY SETUP', 'nav:sch5'], ['WATER LEVEL\nCONTROL', 'nav:wlc']], cur) + unitMW();
+  const regMode = () => { const pc = PC(); return T(745, 516, 'REGULATION MODE(43SCH/WLC)', 't tc') + ['SCH-1', 'SCH-2', 'SCH-3', 'SCH-4', 'SCH-5', 'WLC'].map((m, i) => b3(561 + i * 64, 525, 62, 26, m, pc.mode === m ? 'yel' : '', `x:pcmode:${m}`)).join(''); };
+  function scrSch(k) {
+    const pc = PC(), s = pc.sch[k - 1]; let g = title(`UNIT DAILY OPERATION SCHEDULE(${s.name})`) + backBtn();
+    const X0 = 82, X1 = 943, Y0 = 48, Y1 = 240, bw = (X1 - X0) / 96, y = (v) => Y1 - Math.min(210, v) / 210 * (Y1 - Y0);
+    g += R(X0, Y0, X1 - X0, Y1 - Y0, 'box') + T(70, 52, '210.0MW', 'ts tr') + T(70, Y1 + 2, '0.0MW', 'ts tr');
+    for (let j = 1; j < 5; j++) g += `<line x1="${X0}" x2="${X1}" y1="${Y0 + j * (Y1 - Y0) / 5}" y2="${Y0 + j * (Y1 - Y0) / 5}" stroke="#aaa" stroke-dasharray="3 3"/>`;
+    s.set.forEach((v, i) => { if (v > 0) g += `<rect x="${X0 + i * bw}" y="${y(v)}" width="${bw - 0.8}" height="${Y1 - y(v)}" fill="#22e0f0"/>`; });
+    g += `<polyline points="${s.inp.map((v, i) => `${(X0 + (i + 0.5) * bw).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}" fill="none" stroke="#ff2020" stroke-width="1.3"/>`;
+    const ci = pc.idx(); g += `<line x1="${X0 + (ci + 0.5) * bw}" x2="${X0 + (ci + 0.5) * bw}" y1="${Y0}" y2="${Y1}" stroke="#ffff40" stroke-dasharray="2 2"/>` + T(X0 + (ci + 0.5) * bw, Y0 - 3, clk(), 'ts tc', 'style="fill:#ffff40"');
+    // tabel
+    const cw = 35.9, x0 = 80, yH = 257, RH = 27;
+    g += R(8, yH, 29, 18, 'box') + T(22, yH + 13, 'MIN', 'ts tc') + R(37, yH, 43, 18, 'box') + T(58, yH + 13, 'HOUR', 'ts tc');
+    for (let h = 0; h < 24; h++) g += R(x0 + h * cw, yH, cw, 18, 'box') + T(x0 + h * cw + cw / 2, yH + 13, h, 't tc');
+    [0, 15, 30, 45].forEach((mn, q) => {
+      const y1 = yH + 18 + q * 2 * RH;
+      g += R(8, y1, 29, 2 * RH, 'box') + T(12, y1 + 12, mn, 't') + R(37, y1, 43, RH, 'box') + mline(42, y1 + 14, 'SET\nVALUE', 'ts', 9) + R(37, y1 + RH, 43, RH, 'box') + mline(42, y1 + RH + 14, 'INPUT\nVALUE', 'ts', 9);
+      for (let h = 0; h < 24; h++) {
+        const i = h * 4 + q, sv = s.set[i], iv = s.inp[i], x = x0 + h * cw, cur = i === ci && pc.mode === s.key;
+        g += R(x, y1, cw, RH, 'box', cur ? 'style="stroke:#ffff40;stroke-width:2"' : '') + T(x + cw - 4, y1 + 19, sv, 't tr', 'style="font-size:13px;font-weight:bold"');
+        g += `<g data-a="x:schin:${k}:${i}"><rect x="${x + 2}" y="${y1 + RH + 2}" width="${cw - 4}" height="${RH - 4}" fill="${iv !== sv ? '#ffff20' : '#c0c0c0'}" stroke="#fff"/>${T(x + cw - 6, y1 + RH + 18, iv, 't tr', 'style="fill:#000;font-size:11px"')}</g>`;
+      }
+    });
+    g += b3(17, 525, 98, 26, 'LOAD/SAVE', '', `x:schls:${k}`) + b3(220, 525, 98, 26, 'SET', '', `x:schset:${k}`) + b3(332, 525, 98, 26, 'CANCEL', '', `x:schcan:${k}`) + regMode();
+    g += T(450, 516, s.src.startsWith('ASUMSI') ? s.src : '', 'ts dim');
+    g += T(445, 545, `jam simulasi ${clk()}`, 'ts', 'style="fill:#ffff40"') + `<g data-a="x:setclk">${R(445, 549, 90, 14, '', 'fill="#333" stroke="#888"')}${T(490, 559, 'SET JAM', 'ts tc')}</g>`;
+    g += SCH_NAV(`sch${k}`);
+    return g;
+  }
+
+  /* ============================== WATER LEVEL CONTROL (layar 00036) ============================== */
+  function scrWLC() {
+    const pc = PC(), w = pc.wlc; let g = title('WATER LEVEL CONTROL') + backBtn();
+    const wl = P.intakeWL, ylv = (v) => 229 - (Math.max(575, Math.min(580, v)) - 575) / 5 * 157;
+    g += T(157, 54, 'INTAKE DAM LEVEL', 't tc') + T(50, 76, '580.0 Elm', 't') + T(50, 233, '575.0 Elm', 't') + L(93, 72, 93, 229, 'ln') + L(93, 229, 158, 229, 'ln') + L(158, 229, 248, 72, 'ln');
+    const yy = ylv(wl), xs = 158 + (229 - yy) / 157 * 90;
+    g += `<polygon points="94,229 158,229 ${xs},${yy} 94,${yy}" fill="#1a6ab8" opacity=".75"/><line x1="94" x2="${xs}" y1="${yy}" y2="${yy}" stroke="#4ce0ff" stroke-width="1.5"/>`;
+    g += T(270, 167, 'CURRENT LEVEL', 't') + T(330, 182, `${f(wl, 2)}  Elm`, 't tr cy');
+    // trend 12 jam
+    g += T(654, 54, 'INTAKE DAM LEVEL TREND', 't tc') + R(382, 72, 540, 158, 'box');
+    for (let j = 1; j < 7; j++) g += `<line x1="382" x2="922" y1="${72 + j * 158 / 7}" y2="${72 + j * 158 / 7}" stroke="#bbb" stroke-dasharray="3 3"/>`;
+    for (let j = 1; j <= 6; j++) { const x = 382 + j * 90; g += L(x, 72, x, 230, '') + T(x, 247, `${j * 2}hr`, 't tc'); }
+    const hs = w.hist.concat([[P.t, wl]]), t0 = P.t - 12 * 3600;
+    const pts = hs.filter(([t]) => t >= t0).map(([t, v]) => `${(382 + (t - t0) / 43200 * 540).toFixed(1)},${ylv(v).toFixed(1)}`);
+    if (pts.length > 1) g += `<polyline points="${pts.join(' ')}" fill="none" stroke="#4ce0ff" stroke-width="1.5"/>`;
+    g += `<line x1="382" x2="922" y1="${ylv(w.sp)}" y2="${ylv(w.sp)}" stroke="#ffff40" stroke-dasharray="5 3"/>` + T(918, ylv(w.sp) - 3, 'SET POINT', 'ts tr', 'style="fill:#ffff40"');
+    // diagram blok
+    const blk = (x, y, s) => R(x, y, 18, 18, 'box') + T(x + 9, y + 13, s, 't tc');
+    g += b3(22, 267, 133, 25, 'WATER LEVEL\nSET POINT', '', 'x:wlcsp') + R(24, 295, 135, 27, 'box') + T(150, 313, `${f(w.sp, 2)}  Elm`, 't tr');
+    g += R(24, 333, 135, 53, 'box') + mline(91, 350, 'CURRENT\nWATER LEVEL', 't tc', 11) + L(24, 360, 159, 360, 'ln') + T(150, 378, `${f(wl, 2)}  Elm`, 't tr');
+    g += L(155, 296, 217, 296, 'ln') + `<path d="M217,288 L235,288 L226,304 Z" fill="#000" stroke="${C.wht}"/>` + T(226, 299, 'Δ', 'ts tc') + T(209, 290, '-', 't') + T(229, 318, '+', 't');
+    g += L(159, 365, 228, 365, 'ln') + L(228, 365, 228, 304, 'ln') + L(228, 365, 228, 490, 'ln') + L(228, 490, 361, 490, 'ln') + `<circle cx="228" cy="365" r="2" fill="#fff"/>`;
+    g += L(235, 296, 306, 296, 'ln') + `<circle cx="270" cy="296" r="2" fill="#fff"/>` + blk(306, 288, 'D') + mline(316, 318, '15min\nCYCLE', 't tc', 11) + L(324, 296, 397, 296, 'ln') + blk(397, 288, 'P') + L(415, 296, 487, 296, 'ln') + blk(487, 288, '+') + L(505, 296, 577, 296, 'ln') + blk(577, 288, '×') + L(595, 296, 653, 296, 'ln');
+    g += L(270, 296, 270, 388, 'ln') + L(270, 388, 361, 388, 'ln') + L(450, 388, 495, 388, 'ln') + L(495, 388, 495, 306, 'ln') + L(450, 490, 586, 490, 'ln') + L(586, 490, 586, 306, 'ln');
+    const curve = (x, y, pts, sx, sy, mark) => { let s = R(x, y, 89, 89, 'box') + L(x + 44, y, x + 44, y + 89, 'ln') + `<path d="M${x + 40},${y + 6} L${x + 44},${y} L${x + 48},${y + 6}" fill="none" stroke="#fff"/>`;
+      s += `<polyline points="${pts.map(([a, b]) => `${(x + sx(a)).toFixed(1)},${(y + sy(b)).toFixed(1)}`).join(' ')}" fill="none" stroke="#22e0f0" stroke-width="1.5"/>`;
+      if (mark) s += `<circle cx="${x + sx(mark[0])}" cy="${y + sy(mark[1])}" r="3" fill="#ffff40"/>`; return s; };
+    const e = wl - w.sp, F1 = M.PlantCtrl.F1, F2 = M.PlantCtrl.F2;
+    const ipl = (pts, x0) => { if (x0 <= pts[0][0]) return pts[0][1]; for (let i = 1; i < pts.length; i++) if (x0 <= pts[i][0]) { const [a, b] = pts[i - 1], [c, d] = pts[i]; return b + (d - b) * (x0 - a) / (c - a); } return pts[pts.length - 1][1]; };
+    g += curve(361, 342, F1, (a) => 44 + a / 1.5 * 42, (b) => 44 - b / 45 * 40, [Math.max(-1.5, Math.min(1.5, e)), ipl(F1, e)]);
+    g += curve(361, 446, F2, (a) => (a - 575) / 6 * 86 + 3, (b) => 80 - (b - 0.8) / 1.3 * 60, [Math.max(575, Math.min(581, wl)), ipl(F2, wl)]);
+    g += R(653, 268, 135, 52, 'box') + mline(720, 281, 'WATER LEVEL CONTROL\nCOMPENSATION VALUE', 't tc', 11) + L(653, 292, 788, 292, 'ln') + T(750, 312, `${f(w.comp)}  MW`, 't tr');
+    g += R(653, 334, 135, 52, 'box') + mline(720, 347, 'JOINT CONTROL\nSET POINT VALUE', 't tc', 11) + L(653, 358, 788, 358, 'ln') + T(750, 378, `${f(pc.jP)}  MW`, 't tr');
+    g += R(801, 334, 135, 52, 'box') + T(868, 352, 'TOTAL MW', 't tc') + L(801, 358, 936, 358, 'ln') + T(898, 378, `${f(pc.totals().p)}  MW`, 't tr');
+    g += T(800, 420, pc.mode === 'WLC' ? `WLC aktif · siklus berikut ${Math.ceil((w.cyc - w.t) / 60)} menit` : 'WLC tidak aktif (pilih WLC pada 43SCH/WLC)', 'ts tc', `style="fill:${pc.mode === 'WLC' ? '#ffff40' : '#888'}"`);
+    g += mline(800, 455, 'Gain P, kurva fungsi & faktor level = ASUMSI\n(bentuk mengikuti layar 00036). Set point layar\nasli 575.00 m; simulator memakai 578.60 m.', 'ts tc dim', 11);
+    g += regMode() + SCH_NAV('wlc');
+    return g;
+  }
+
+  /* ============================== INTAKE DAM & REREGULATING DAM (layar 00022) ============================== */
+  function scrDamOPS() {
+    const d = DAM(); let g = title('INTAKE DAM & REREGULATING DAM') + backBtn();
+    const X = [12, 80, 98, 160, 228, 290, 352, 415, 480, 542, 605];
+    g += T(130, 64, 'POS.', 't tc') + T(194, 64, 'SET POS.', 't tc');
+    const rows = [['SPILLWAY\nFLAP GATE', 3, (i) => [f(d.flap[i], 0), '%'], (i) => `x:damset:flap:${i}`], ['SPILLWAY\nGATE', 3, (i) => [f(d.sg[i] * 100, 0), 'cm'], (i) => `x:damset:sg:${i}`],
+      ['SLUICE\nGATE', 2, (i) => [d.isl[i] > 0 ? 'OPEN' : 'CLOSE', '']], ['UPPER\nSCOURING\nGATE', 2, (i) => [f(d.usg[i] * 100, 0), 'cm']], ['LOWER\nSCOURING\nGATE', 2, (i) => [d.lsg[i] > 0 ? 'OPEN' : 'CLOSE', '']],
+      ['INTAKE\nGATE', 2, (i) => [d.ig[i] ? 'OPEN' : 'CLOSE', '']], ['RAKING\nEQUIPMENT', 1, () => [d.rake ? 'RUN' : 'STOP', '']]];
+    let y = 72;
+    for (const [lab, nr, val, act] of rows) {
+      const h = nr === 1 ? 22 : 22.6;
+      g += R(X[0], y, X[1] - X[0], h * nr, 'box') + mline((X[0] + X[1]) / 2, y + h * nr / 2 + 3, lab, 'ts tc', 9);
+      for (let i = 0; i < nr; i++) {
+        const yy = y + i * h, [v, u] = val(i);
+        if (nr > 1) g += R(X[1], yy, X[2] - X[1], h, 'box') + T(89, yy + 15, `-${i + 1}`, 'ts tc'); else g += R(X[1], yy, X[2] - X[1], h, 'box');
+        g += R(X[2], yy, X[3] - X[2], h, 'box') + T(X[3] - 18, yy + 15, v, 't tr') + T(X[3] - 4, yy + 15, u, 'ts tr');
+        g += act ? b3(X[3] + 1, yy + 1, 65, h - 2, `${act ? (u === '%' ? f(d.flapSet[i], 0) : f(d.sgSet[i] * 100, 0)) : ''} ${u}`, '', act(i)) : R(X[3], yy, X[4] - X[3], h, 'box');
+        for (let c = 4; c < X.length - 1; c++) g += R(X[c], yy, X[c + 1] - X[c], h, 'box');
+      }
+      y += h * nr;
+    }
+    // skema
+    g += `<path d="M620,50 L940,50 L915,85 L645,85 Z" fill="#888"/><path d="M630,52 L930,52 L910,80 L650,80 Z" fill="#3a7ae8"/>` + T(780, 69, 'INTAKE DAM', 't tc');
+    g += `<rect x="666" y="85" width="12" height="105" fill="#bbb"/><rect x="690" y="85" width="12" height="105" fill="#bbb"/><path d="M666,190 Q684,214 702,190" fill="none" stroke="#bbb" stroke-width="12"/>`;
+    g += `<rect x="666" y="110" width="36" height="10" fill="#111"/><rect x="666" y="125" width="36" height="5" fill="#111"/>`;
+    for (let k = 0; k < 6; k++) { const x = 778 + k * 16; g += `<rect x="${x}" y="80" width="11" height="105" fill="${k < 3 && d.sg[k] > 0.01 ? '#6ac8ff' : '#2a5ad8'}"/>`; }
+    g += `<rect x="776" y="${130}" width="100" height="5" fill="#fff" opacity=".6"/><path d="M778,185 L874,185 L888,262 L770,262 Z" fill="#2a8af0"/>` + T(829, 274, 'MUSI RIVER', 't tc');
+    g += T(620, 112, 'INTAKE', 't') + T(620, 122, 'GATE', 't') + mline(722, 113, 'SLUICE\nGATE', 't', 10) + mline(722, 145, 'UPPER\nSCOURING\nGATE', 't', 10) + mline(722, 180, 'LOWER\nSCOURING\nGATE', 't', 10) + mline(883, 114, 'SPILLWAY\nFLAP GATE', 't', 11) + mline(883, 148, 'SPILLWAY\nGATE', 't', 11);
+    g += `<rect x="678" y="200" width="12" height="230" fill="#bbb"/><path d="M640,305 L640,290 L728,290 L728,330" fill="none" stroke="#bbb" stroke-width="10"/><rect x="635" y="300" width="10" height="130" fill="#bbb"/><rect x="723" y="300" width="10" height="130" fill="#bbb"/>`;
+    [[638, 3], [684, 2], [728, 1]].forEach(([x, n]) => { const run = U(n).p.cb; g += `<g data-a="nav:ovw${n}"><circle cx="${x}" cy="365" r="15" fill="${run ? '#ff2020' : '#180000'}" stroke="#ff2020"/>${mline(x, 365, `UNIT\nNo.${n}`, 'ts tc', 9)}</g>`; });
+    g += `<path d="M640,430 L733,430 L733,415 M376,430 L640,430" fill="none" stroke="#bbb" stroke-width="10"/><path d="M376,430 L376,445" fill="none" stroke="#bbb" stroke-width="10"/>`;
+    g += `<path d="M335,445 L430,445 L415,478 L350,478 Z" fill="#888"/><path d="M340,447 L425,447 L413,474 L352,474 Z" fill="#3a7ae8"/>` + mline(382, 458, 'REREGULATING\nDAM', 'ts tc', 9);
+    g += `<rect x="352" y="478" width="10" height="70" fill="#bbb"/><rect x="372" y="478" width="10" height="120" fill="#bbb"/><path d="M352,540 Q367,560 382,540" fill="none" stroke="#bbb" stroke-width="10"/>`;
+    // tabel nilai
+    const qT = d.qTurb(), inT = d.qnEst, gI = P.spillQ, gR = d.rOut, V7 = (189.475 * P.intakeWL ** 2 - 218232.925 * P.intakeWL + 62839304.175), V6 = (d.rwl > 150 ? 17.425 * d.rwl ** 2 - 5221.875 * d.rwl + 391245.75 : 6 * d.rwl - 873);
+    const tb = [['WATER LEVEL', `${f(P.intakeWL, 2)} Elm`, `${f(d.rwl, 2)} Elm`], ['INFLOW', `${f(inT, 1)} m3/s`, `${f(d.rIn, 1)} m3/s`], ['OUTFLOW', `${f(qT, 1)} m3/s`, `${f(gR, 1)} m3/s`],
+      ['TOTAL GATE\nDISCHARGE', `${f(gI, 1)} m3/s`, `${f(gR, 1)} m3/s`], ['TOTAL\nDISCHARGE', `${f(qT + gI, 1)} m3/s`, `${f(gR, 1)} m3/s`], ['STORAGE VOLUME', `${f(V7, 0)} x1000m3`, `${f(V6, 0)} x1000m3`]];
+    g += R(12, 447, 306, 18, 'box') + L(102, 447, 102, 612, 'ln') + L(210, 447, 210, 612, 'ln') + T(156, 460, 'INTAKE DAM', 't tc') + T(264, 460, 'REREGULATING DAM', 't tc');
+    tb.forEach(([a, b, c], i) => { const yy = 465 + i * 24.5; g += R(12, yy, 306, 24.5, 'box') + mline(15, yy + 15, a, 'ts', 9) + T(204, yy + 16, b, 't tr') + T(312, yy + 16, c, 't tr'); });
+    g += L(102, 447, 102, 612, 'ln') + L(210, 447, 210, 612, 'ln');
+    // re-dam gates
+    g += T(537, 498, 'POS.', 't tc') + T(602, 498, 'SET POS.', 't tc');
+    g += R(412, 507, 90, 22, 'box') + mline(457, 520, 'REREGULATING\nGATE', 'ts tc', 9) + R(502, 507, 65, 22, 'box') + T(552, 522, f(d.rg * 100, 0), 't tr') + T(563, 522, 'cm', 'ts tr') + b3(568, 508, 65, 20, `${f(d.rgSet * 100, 0)} cm`, '', 'x:damset:rg:0') + R(633, 507, 312, 22, 'box');
+    g += R(412, 529, 72, 46, 'box') + mline(448, 553, 'REREGULATING\nSCOURING\nGATE', 'ts tc', 9);
+    [0, 1].forEach((i) => { const yy = 529 + i * 23; g += R(484, yy, 18, 23, 'box') + T(493, yy + 15, `-${i + 1}`, 'ts tc') + R(502, yy, 65, 23, 'box') + T(552, yy + 16, f(d.sl[i] * 100, 0), 't tr') + T(563, yy + 16, 'cm', 'ts tr') + R(567, yy, 378, 23, 'box'); });
+    g += T(650, 640, 'Flap/sluice/scouring/intake gate & raking: posisi saja (kurva debit tidak tersedia). Scouring gate re-dam = sluice gate JEZ2K042.', 'ts tc dim');
     return g;
   }
 
   /* ============================== ANALOG INPUT (HTML) ============================== */
   const tr = (cells, cls = '') => `<tr class="${cls}">${cells.map((c, i) => i ? `<td class="n">${c}</td>` : `<td>${esc(c)}</td>`).join('')}</tr>`;
-  function aiUSS() {
-    const ss = SS();
-    const rows = [['400V BUS-A (P/H)', V('P4A'), '—', '—'], ['400V BUS-B (P/H)', V('P4B'), '—', '—'],
-      ['SSTr No.1 (252-L1, 20 kV)', KV('SST1P'), A('252-L1'), KW('252-L1')], ['SSTr No.2 (252-L2, 20 kV)', KV('SST2P'), A('252-L2'), KW('252-L2')],
-      ['352-L1 incoming bus A', V('P4A'), A('352-L1'), KW('352-L1')], ['352-L2 incoming bus B', V('P4B'), A('352-L2'), KW('352-L2')],
-      ...[1, 2, 3].flatMap((n) => [[`452-${n} USTr No.${n}`, V('UB' + n), A('452-' + n), KW('452-' + n)], [`400V BUS UNIT NO.${n}`, V('UB' + n), f(ss.nodeAmps('UB' + n), 1) + ' A', f(ss.nodeKW['UB' + n] || 0, 1) + ' kW'],
-        [`MCC${n}A / MCC${n}B`, '—', `${f(ss.nodeAmps('MCC' + n + 'A'), 1)} / ${f(ss.nodeAmps('MCC' + n + 'B'), 1)} A`, `${f(ss.load['MCC' + n + 'A'] || 0, 1)} / ${f(ss.load['MCC' + n + 'B'] || 0, 1)} kW`]]),
-      ['MCC COMMON (352-4)', '—', A('352-4'), KW('352-4')], ['MISCELLANEOUS SUPPLY', '—', f(ss.nodeAmps('MISC'), 1) + ' A', f(ss.load.MISC || 0, 1) + ' kW']];
-    const temps = [1, 2, 3].map((n) => [`USTr No.${n} WINDING`, `${f(ss.ustT[n])} ℃`]);
-    return `<div class="h2">ANALOG INPUT – STATION SERVICE (USS / POWERHOUSE)</div><div class="fs"><div class="col"><table class="tbl"><tr><th>Titik</th><th>Tegangan</th><th>Arus</th><th>Daya</th></tr>${rows.map((r) => tr(r)).join('')}</table></div>
-      <div class="col"><table class="tbl"><tr><th>Suhu</th><th>Nilai</th></tr>${temps.map((r) => tr(r)).join('')}</table>
-      <table class="tbl"><tr><th>Relai 27 (P/H)</th><th>Status</th></tr>${['27-L1U', '27-L2U', '27-1U', '27-2U'].map((k) => tr([`${k} – ${REL[k][1]}`, ss.rel[k] ? 'OPERATE' : 'normal'], ss.rel[k] ? 'alm' : '')).join('')}</table>
-      <div class="note2">Arus dihitung dari daya beban (cos φ 0.80 di 400 V, 0.88 di 20 kV), dikalibrasi terhadap layar OPS 13-Okt-2017.</div></div></div>`;
-  }
-  function aiMSS() {
-    const ss = SS(), dg = ss.dg;
-    const rows = [['20kV BUS-A', KV('M20A'), '—', '—'], ['20kV BUS-B', KV('M20B'), '—', '—'], ['252-LS incoming LSTr', KV('LSB'), A('252-LS'), MW('252-LS')],
-      ['252DL-BC Base Camp & Curup', KV('BCX'), A('252DL-BC'), MW('252DL-BC')], ['252DL-ID Intake Dam', KV('IDX'), A('252DL-ID'), MW('252DL-ID')], ['252DL-RD Re-reg Dam', KV('RDX'), A('252DL-RD'), MW('252DL-RD')],
-      ['252B-A2 cable feeder no.1', KV('CAB1'), A('252B-A2'), KW('252B-A2')], ['252B-B2 cable feeder no.2', KV('CAB2'), A('252B-B2'), KW('252B-B2')],
-      ['252B-A1 SSTr No.3', KV('SST3P'), A('252B-A1'), KW('252B-A1')], ['252B-B1 SSTr No.4', KV('SST4P'), A('252B-B1'), KW('252B-B1')],
-      ['400V BUS-A (MCH)', V('M4A'), A('352-S1'), KW('352-S1')], ['400V BUS-B (MCH)', V('M4B'), A('352-S2'), KW('352-S2')], ['400V BUS-C (MCH)', V('M4C'), '—', '—'],
-      ...['352B-A3', '352B-A4', '352B-B3', '352B-B4'].map((k) => [k, '—', A(k), KW(k)]),
-      ['DIESEL GENERATOR (52DG)', `${f(dg.v)} V · ${f(dg.f)} Hz`, A('52DG'), `${f(dg.kw)} kW`]];
-    return `<div class="h2">ANALOG INPUT – STATION SERVICE (MSS / MAIN CONTROL HOUSE)</div><div class="fs"><div class="col"><table class="tbl"><tr><th>Titik</th><th>Tegangan</th><th>Arus</th><th>Daya</th></tr>${rows.map((r) => tr(r)).join('')}</table></div>
-      <div class="col"><table class="tbl"><tr><th>Relai 27 (MCH)</th><th>Status</th></tr>${['27-BC', '27-1M', '27-2M', '27-L1M', '27-L2M', '27-3M', '27-4M'].map((k) => tr([`${k} – ${REL[k][1]}`, ss.rel[k] ? 'OPERATE' : 'normal'], ss.rel[k] ? 'alm' : '')).join('')}</table>
-      <div class="note2">Beban MCH: kelompok 1 (A3/B3) ${f(ss.load.LG1 || 0, 1)} kW, kelompok 2 (A4/B4) ${f(ss.load.LG2 || 0, 1)} kW.</div></div></div>`;
-  }
   function aiDam() {
     const d = DAM();
     const rows = [['INTAKE WATER LEVEL (7AI0011)', `${f(P.intakeWL, 3)} El.m`], ['INTAKE DAM WL (7AI0007)', `${f(P.intakeWL, 3)} El.m`], ['Volume intake (f7)', `${f(volI(P.intakeWL), 0)} ×10³ m³`],
@@ -409,39 +806,36 @@
     return `<div class="h2">ANALOG INPUT – INTAKE & RE-REGULATING DAM</div><table class="tbl" style="max-width:720px;margin:0 auto"><tr><th>Titik</th><th>Nilai</th></tr>${rows.map((r) => tr(r)).join('')}</table>
       <div class="row" style="justify-content:center;display:flex;gap:6px"><span class="sb" data-a="nav:dam" style="background:#b4b4b4;color:#111;padding:4px 8px;cursor:pointer">INTAKE & RE-DAM ▶</span></div>`;
   }
-  function dpo() {
-    const d = P.daily, us = d.u, tot = us.reduce((a, r) => ({ mwh: a.mwh + r.mwh, mvarh: a.mvarh + r.mvarh, hrs: a.hrs + r.hrs }), { mwh: 0, mvarh: 0, hrs: 0 });
-    const fmt = (t) => { const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60; return `${h} h ${String(m).padStart(2, '0')} m`; };
-    const rows = us.map((r, i) => tr([`UNIT ${i + 1}`, f(r.mwh, 2), f(r.mvarh, 2), f(r.hrs, 2), f(r.maxP, 1), r.starts, r.trips])).join('') + tr(['PLANT', f(tot.mwh, 2), f(tot.mvarh, 2), f(tot.hrs, 2), '—', '—', '—']);
-    return `<div class="h2">DAILY POWER OPERATION (REKAP SIMULASI)</div>
-      <table class="tbl"><tr><th>Unit</th><th>Energi (MWh)</th><th>Reaktif (MVArh)</th><th>Jam paralel (h)</th><th>Daya maks (MW)</th><th>Paralel (kali)</th><th>Lockout 86 (kali)</th></tr>${rows}</table>
-      <table class="tbl" style="max-width:640px"><tr><th>Besaran</th><th>Nilai</th></tr>
-      ${tr(['Periode rekap (waktu simulasi)', fmt(d.t)])}${tr(['Volume air turbin', `${f(d.turbM3 / 1e3, 1)} ×10³ m³`])}${tr(['Volume spillway', `${f(d.spillM3 / 1e3, 1)} ×10³ m³`])}
-      ${tr(['Intake WL min / maks', `${f(d.wlMin === 999 ? P.intakeWL : d.wlMin, 2)} / ${f(d.wlMax || P.intakeWL, 2)} m`])}${tr(['Energi pemakaian sendiri (station service)', `${f(d.ssKWh, 1)} kWh`])}
-      ${tr(['Rata-rata daya plant', `${f(d.t > 0 ? tot.mwh / (d.t / 3600) : 0, 1)} MW`])}</table>
-      <div class="row" style="display:flex;gap:6px"><span class="sb" data-a="x:dpo:reset" style="background:#b4b4b4;color:#111;padding:4px 8px;cursor:pointer">RESET REKAP</span></div>
-      <div class="note2">Rekap dihitung dari simulasi sejak inisialisasi atau reset terakhir. Format laporan harian resmi PLTA Musi belum tersedia; kolom dapat disesuaikan bila contoh laporan dikirim.</div>`;
-  }
-
   /* ============================== REGISTRASI ============================== */
   Object.assign(EXTS, {
+    sso: { no: '00005', title: () => 'STATION SERVICE OVERVIEW', grp: 'stv', draw: scrSSO },
     mch: { no: '00003', title: () => 'MAIN CONTROL HOUSE', grp: 'stv', draw: scrMCH },
     uph: { no: '00004', title: () => 'UNDERGROUND POWERHOUSE', grp: 'stv', draw: scrUPH },
-    sso: { no: '00005', title: () => 'STATION SERVICE OVERVIEW', grp: 'stv', draw: scrSSO },
-    ssc: { no: '00020', title: () => 'SWITCHYARD / STATION SERVICE CONTROL PANEL', grp: 'stv', draw: scrSSC },
-    dam: { no: '00060', title: () => 'INTAKE & REREGULATING DAM', grp: 'dam', draw: scrDam },
-    wlc: { no: '00061', title: () => 'WATER LEVEL CONTROL', grp: 'dam', html: true, draw: scrWLC },
-    aidam: { no: '00087', title: () => 'ANALOG INPUT – DAM', grp: 'dam', html: true, draw: aiDam },
-    aiuss: { no: '00085', title: () => 'ANALOG INPUT – STATION SERVICE (USS)', grp: 'stv', html: true, draw: aiUSS },
-    aimss: { no: '00086', title: () => 'ANALOG INPUT – STATION SERVICE (MSS)', grp: 'stv', html: true, draw: aiMSS },
-    dpo: { no: '00095', title: () => 'DAILY POWER OPERATION', grp: 'ins', html: true, draw: dpo },
+    ssc: { no: '00027', title: () => 'SWITCHYARD/STATION SERVICE CONTROL PANEL', grp: 'ctl', draw: scrSSC },
+    air: { no: '00010', title: () => 'AIR SUPPLY SYSTEM', grp: 'airg', draw: scrAir },
+    rain: { no: '00023', title: () => 'RAIN FALL MONITOR', grp: 'airg', draw: scrRain },
+    dam: { no: '00022', title: () => 'INTAKE DAM & REREGULATING DAM', grp: 'dam', draw: scrDamOPS },
+    wlc: { no: '00036', title: () => 'WATER LEVEL CONTROL', grp: 'dam', draw: scrWLC },
+    damx: { no: '00062', title: () => 'INTAKE & RE-DAM – DETAIL RTU (INSTRUKTUR)', grp: 'dam', draw: scrDamX },
+    rdc: { no: '00063', title: () => 'RE-REGULATING DAM CONTROL (JEZ2K042)', grp: 'dam', html: true, draw: scrRDC },
+    aidam: { no: '00087', title: () => 'RTU ANALOG INPUT (DAM)', grp: 'aig', html: true, draw: aiDam },
+    aiuss: { no: '00084', title: () => 'ANALOG INPUT FOR UNDERGROUND S/S', grp: 'aig', draw: aiUSS },
+    aimss: { no: '00085', title: () => 'ANALOG INPUT FOR MAIN CONTROL ROOM S/S', grp: 'aig', draw: aiMSS },
+    aisy: { no: '00086', title: () => 'ANALOG INPUT FOR SWITCHYARD', grp: 'aig', draw: aiSY },
+    dpo: { no: '00096', title: () => 'DAILY POWER OPERATION', grp: 'dpog', draw: scrDPO },
   });
-  EXTU.tact = { no: (n) => '0011' + n, title: (n) => `NO.${n} TURBINE ACTUATOR`, grp: 'sys', draw: scrTact };
-  EXTU.ivh = { no: (n) => '0012' + n, title: (n) => `NO.${n} INLET VALVE HYDRAULIC`, grp: 'sys', draw: scrIVH };
-  TABS.stv = () => [['sso', 'S/S OVERVIEW'], ['sy', '150kV SWITCHYARD'], ['mch', 'MAIN CONT. HOUSE'], ['uph', 'UNDER.POWERHOUSE'], ['ssc', 'S/S CTRL PANEL'], ['trend', 'Historical']];
-  TABS.dam = () => [['dam', 'INTAKE & RE-DAM'], ['wlc', 'WATER LEVEL CTRL'], ['aidam', 'ANALOG INPUT'], ['trend', 'Historical']];
-  const sys0 = TABS.sys; TABS.sys = (n) => [...sys0(n).filter((t) => t[0] !== 'trend'), [`tact${n}`, 'TURB. ACTUATOR'], [`ivh${n}`, 'I/V HYDRAULIC'], ['trend', 'Historical']];
-  const ins0 = TABS.ins; TABS.ins = () => [...ins0(), ['dpo', 'DAILY POWER']];
+  [1, 2, 3, 4, 5].forEach((k) => { EXTS['sch' + k] = { no: '0003' + k, title: () => `UNIT DAILY OPERATION SCH.(${PC().sch[k - 1].name})`, grp: 'schg', draw: () => scrSch(k) }; });
+  EXTU.tact = { no: (n) => '000' + (8 + n) + (n === 1 ? '1' : ''), title: (n) => `NO.${n} UNIT HYDRAULIC TURBINE ACTUATOR CON`, grp: 'sys', draw: scrTact };
+  EXTU.tact.no = (n) => ['00011', '00012', '00013'][n - 1];
+  EXTU.ivh = { no: (n) => ['00014', '00015', '00016'][n - 1], title: (n) => `NO.${n} UNIT INLET VALVE HYDRAULIC CONTROL`, grp: 'sys', draw: scrIVH };
+  TABS.stv = () => [['sso', 'S/S OVERVIEW'], ['sy', '150kV SWITCHYARD'], ['mch', 'MAIN CONT. HOUSE'], ['uph', 'UNDER.POWERHOUSE'], ['trend', 'Historical']];
+  TABS.ctl = () => [['ssc', 'SY/SS CONTROL'], ['ctl1', 'NO.1 CONTROL PNL'], ['ctl2', 'NO.2 CONTROL PNL'], ['ctl3', 'NO.3 CONTROL PNL'], ['sy', '150kV SY'], ['trend', 'Historical']];
+  TABS.dam = () => [['dam', 'INTAKE & REREG.'], ['wlc', 'WATER LEVEL CONT'], ['damx', 'DETAIL RTU'], ['rdc', 'RE-DAM CONTROL'], ['trend', 'Historical']];
+  TABS.airg = () => [['air', 'AIR SYSTEM'], ['rain', 'RAIN FALL MONI.'], ['trend', 'Historical']];
+  TABS.aig = () => [['aiuss', 'USS ANALOG INPUT'], ['aimss', 'MSS ANALOG INPUT'], ['aisy', 'SY ANALOG INPUT'], ['aidam', 'RTU ANALOG INPUT'], ['ai1', 'UNIT1 ANALOG'], ['trend', 'Historical']];
+  TABS.schg = () => [['sch1', 'SCHEDULE SET-1'], ['sch2', 'SCHEDULE SET-2'], ['sch3', 'SCHEDULE SET-3'], ['sch4', 'SCHEDULE SET-4'], ['sch5', 'SCHEDULE SET-5'], ['trend', 'Historical']];
+  TABS.dpog = () => [['dpo', 'DAILY POWER OPE.'], ['dam', 'INTAKE & REREG.'], ['wlc', 'WATER LEVEL CONT'], ['trend', 'Historical']];
+  const sys0 = TABS.sys; TABS.sys = (n) => { const b = sys0(n); return [b[0], [`tact${n}`, `NO.${n} GV OIL SYS.`], [`ivh${n}`, `NO.${n} IV OIL SYS.`], ...b.slice(1)]; };
 
   /* ============================== AKSI ============================== */
   const MAC = {
@@ -456,10 +850,13 @@
   const MAC_TXT = { mchopen: 'Membuka semua CB 20 kV & 400 V di main control house (termasuk 52DG).\nPowerhouse kehilangan catu dari kabel.',
     mchnormal: 'Mengembalikan MCH ke catu LSTr:\nBT2/BT3, 52DG, feeder → OPEN; 289-LSA/B → CLOSE; 252-LS; SSTr3/4;\nfeeder A3/B4; ID/RD; cable feeder 1/2.\nSyarat: 152-LST (switchyard) CLOSE.',
     phnormal: 'Mengembalikan powerhouse ke catu SSTr No.1/No.2 (transfer bus mati):\nsemua breaker unit & BT1 OPEN → 252-L1/L2 → 352-L1/L2 → 352-11/21/31.\nMCC unit padam ± 3 detik.' };
+  const numDlg = (ttl, msg, cur, unit, step, fn) => dialog(ttl, msg, () => { const v = parseFloat(document.querySelector('#dX input').value); if (!isNaN(v)) fn(v); },
+    { extra: `<div class="drow"><span class="grow"></span><input type="number" step="${step}" value="${cur}"> ${unit}</div>`, okText: 'SET' });
+  const btnRow = (items) => `<div class="simgrid">${items.map(([a, l]) => `<button data-a="${a}">${l}</button>`).join('')}</div>`;
   Object.assign(EXTA, {
     ssd: ([id]) => {
       const ss = SS(), d = DEV[id]; if (!d) return;
-      const cur = !!ss.st[id], why = ss.interlock(id, !cur);
+      const cur = !!ss.st[id], why = PC().ssBlock(id) || ss.interlock(id, !cur);
       const kind = { CB: 'CIRCUIT BREAKER', DS: 'DISCONNECTING SWITCH', ES: 'EARTHING SWITCH' }[d.t];
       const loc = { MCH20: 'MCH 20 kV', MCH04: 'MCH 400 V', PH20: 'P/H 20 kV', PH04: 'P/H 400 V' }[d.loc] + (d.p ? ` · panel ${d.p}` : '');
       const msg = `${id}  (${kind})\n${d.desc}\n${loc} · interlock: ${d.src === 'doc' ? 'logic Alstom' : d.src}\n\n${cur ? 'CLOSE' : 'OPEN'} → ${cur ? 'OPEN' : 'CLOSE'}` +
@@ -475,8 +872,54 @@
       P.log('OK', `SS: ${MAC_LAB[k]} selesai (${done} langkah)`);
     }),
     ssfr: ([loc]) => { SS().flickerReset(loc || ''); },
-    ssdg: ([c]) => dialog('DIESEL GENERATOR', `DG ${c === 'start' ? 'START' : 'STOP'}\n\nEXECUTE ?`, () => (c === 'start' ? SS().dgStart() : SS().dgStop())),
-    ssaco: ([site, v]) => { const ss = SS(); const nv = v || (ss.aco[site] === 'AUTO' ? 'LOCK' : 'AUTO'); dialog('CHANGEOVER', `${site === 'mch' ? 'MSSLCU (MCH)' : 'USSLCU (P/H)'} → ${nv}\n\nEXECUTE ?`, () => { ss.aco[site] = nv; P.log('CMD', `SS: changeover ${site.toUpperCase()} ${nv}`); }); },
+    ssdgd: () => { const dg = SS().dg; dialog('DIESEL GENERATOR (52DG)', `Status: ${dg.run ? 'RUNNING' : dg.cmd ? 'STARTING' : 'STOP'}${dg.fail ? ' · START FAILURE' : ''}\n${f(dg.v)} V · ${f(dg.f)} Hz · ${f(dg.kw)} kW · jam operasi ${f(dg.hrs, 2)} h\n\nChangeover otomatis (343ASR): ${PC().sel.s343ASR}\nRating DG belum ada data; start ± 8 s, 84DG + 5 s (asumsi).`, null,
+      { extra: btnRow([['x:ssdg:start', 'DG START'], ['x:ssdg:stop', 'DG STOP'], ['x:ssmac:mchnormal', 'MCH NORMAL']]) }); },
+    ssdg: ([c]) => { X.closeDlg(); dialog('DIESEL GENERATOR', `DG ${c === 'start' ? 'START' : 'STOP'}\n\nEXECUTE ?`, () => { const w = PC().ssBlock('52DG'); if (w) { P.log('ALARM', `SS: DG ${c.toUpperCase()} ditolak – ${w}`); return; } c === 'start' ? SS().dgStart() : SS().dgStop(); }); },
+    // selector panel SY/SS
+    sysel: ([k, v]) => { const sy = P.sy, val = v === 'true' ? true : v === 'false' ? false : v; if (sy.sel[k] === val) return; const lab = typeof val === 'boolean' ? (val ? 'USE' : 'LOCK') : val;
+      const nm = { s143STEP: '143STEP', s143R: '143R', busProt: 'BUS BAR PROTECTION', L1ar: 'AUTO RECLOSING T/L NO.1', L2ar: 'AUTO RECLOSING T/L NO.2' }[k];
+      dialog('SELECT', `SWITCHYARD\n${nm} → ${lab}\n\nEXECUTE ?`, () => { sy.sel[k] = val; P.log('CMD', `SY: ${nm} ${lab}`); }); },
+    pcsel: ([k, v]) => { const pc = PC(); if (pc.sel[k] === v) return; const nm = { s343STEP: '343STEP', s443STEP: '443STEP', s343R: '343R', s443R: '443R', s343ASR: '343ASR', car1: 'CARRIER RELAY T/L NO.1', car2: 'CARRIER RELAY T/L NO.2' }[k];
+      dialog('SELECT', `${nm} → ${v}${k === 's343ASR' ? '\n(changeover otomatis station service MSSLCU & USSLCU)' : ''}${k.startsWith('car') ? '\n(status saja – skema teleproteksi tidak dimodelkan)' : ''}\n\nEXECUTE ?`, () => { pc.sel[k] = v; P.log('CMD', `PLANT: ${nm} ${v}`); }); },
+    pcmode: ([m]) => { const pc = PC(), nv = pc.mode === m ? null : m;
+      dialog('REGULATION MODE (43SCH/WLC)', `${nv ? `43SCH/WLC → ${nv}` : `${m} → OFF (set point joint manual)`}\n\nUnit dengan ALR = JOINT mengikuti set point joint.\nUnit JOINT saat ini: ${P.units.filter((u) => pc.alrMode(u) === 'JOINT').map((u) => 'U' + u.n).join(', ') || 'tidak ada'}\n\nEXECUTE ?`, () => pc.setMode(nv)); },
+    pcjp: () => { const pc = PC(); if (pc.mode) { dialog('MESSAGE', `Set point joint dikendalikan oleh ${pc.mode}.\nMatikan 43SCH/WLC untuk set manual.`, null); return; } numDlg('JOINT CONTROL SET POINT', 'Active power total (MW)', f(pc.jP), 'MW', 1, (v) => { pc.jPman = pc.jP = Math.max(0, Math.min(216, v)); P.log('CMD', `PLANT: joint control set point = ${pc.jP} MW`); }); },
+    pcjq: () => { const pc = PC(); numDlg('JOINT CONTROL SET POINT', 'Reactive power total (MVar)', f(pc.jQ), 'MVar', 1, (v) => { pc.jQ = Math.max(-120, Math.min(150, v)); P.log('CMD', `PLANT: joint control set point Q = ${pc.jQ} MVar`); }); },
+    ualr: ([n, m]) => { const pc = PC(), u = U(+n); if (pc.alrMode(u) === m) return; dialog('ALR CONTROL MODE', `UNIT NO.${n}\nALR → ${m}\n\nEXECUTE ?`, () => { pc.setAlr(u, m); P.log('CMD', `U${n}: ALR CONTROL MODE ${m}`); }); },
+    uaqr: ([n, m]) => { const pc = PC(), u = U(+n); if (pc.aqrMode(u) === m) return; dialog('AQR CONTROL MODE', `UNIT NO.${n}\nAQR → ${m}\n\nEXECUTE ?`, () => { pc.setAqr(u, m); P.log('CMD', `U${n}: AQR CONTROL MODE ${m}`); }); },
+    ualrsp: ([n]) => { const u = U(+n), pc = PC(); if (pc.alrMode(u) !== 'INDIVIDUAL') { dialog('MESSAGE', `ALR SET POINT unit ${n} hanya dapat diubah pada mode INDIVIDUAL.`, null); return; } numDlg('ALR SET POINT', `UNIT NO.${n}`, f(u.sw.alrSP), 'MW', 0.5, (v) => { u.sw.alrSP = Math.max(u.sw.minP, Math.min(u.sw.maxP, v)); P.log('CMD', `U${n}: ALR SET POINT ${u.sw.alrSP} MW`); }); },
+    uaqrsp: ([n]) => { const u = U(+n), pc = PC(); if (pc.aqrMode(u) !== 'SEMI AUTO') { dialog('MESSAGE', `AQR SET POINT unit ${n} hanya dapat diubah pada mode SEMI AUTO.`, null); return; } numDlg('AQR SET POINT', `UNIT NO.${n}`, f(u.sw.aqrSP), 'MVar', 0.5, (v) => { u.sw.aqrSP = Math.max(-40, Math.min(50, v)); P.log('CMD', `U${n}: AQR SET POINT ${u.sw.aqrSP} MVar`); }); },
+    // jadwal
+    schin: ([k, i]) => { const s = PC().sch[+k - 1], h = Math.floor(+i / 4), m = (+i % 4) * 15; numDlg(`SCHEDULE ${s.key}`, `${s.name}\nINPUT VALUE jam ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (MW total plant)\n\nCentang "isi sampai akhir jam" tidak tersedia – ulangi per sel.`, s.inp[+i], 'MW', 5, (v) => { s.inp[+i] = Math.max(0, Math.min(210, Math.round(v))); }); },
+    schset: ([k]) => { const s = PC().sch[+k - 1]; dialog('SCHEDULE', `${s.key} ${s.name}\nTerapkan INPUT VALUE menjadi SET VALUE?\n\nEXECUTE ?`, () => PC().schSet(+k - 1)); },
+    schcan: ([k]) => { PC().schCancel(+k - 1); },
+    schls: ([k, op]) => {
+      const s = PC().sch[+k - 1], key = 'musi_sch_' + s.key;
+      if (!op) { dialog('LOAD/SAVE', `${s.key} ${s.name}\nSAVE: simpan INPUT VALUE di perangkat ini\nLOAD: ambil INPUT VALUE tersimpan\nDEFAULT: kembali ke data layar OPS`, null, { extra: btnRow([[`x:schls:${k}:save`, 'SAVE'], [`x:schls:${k}:load`, 'LOAD'], [`x:schls:${k}:def`, 'DEFAULT']]) }); return; }
+      X.closeDlg();
+      try {
+        if (op === 'save') { localStorage.setItem(key, JSON.stringify(s.inp)); P.log('CMD', `SCHEDULE ${s.key} disimpan`); }
+        else if (op === 'load') { const a = JSON.parse(localStorage.getItem(key) || 'null'); if (Array.isArray(a) && a.length === 96) { s.inp = a.map(Number); P.log('CMD', `SCHEDULE ${s.key} dimuat`); } else dialog('MESSAGE', 'Belum ada jadwal tersimpan di perangkat ini.', null); }
+        else { const d0 = M.PlantCtrl.SCH[+k - 1]; s.inp = d0.inp.slice(); }
+      } catch (e) { dialog('MESSAGE', 'Penyimpanan perangkat tidak tersedia.', null); }
+    },
+    setclk: () => { const pc = PC(), t = pc.tod(); dialog('JAM SIMULASI', `Jam simulasi sekarang ${clk()}\nAtur jam (HH:MM) untuk latihan jadwal/WLC:`, () => { const v = document.querySelector('#dX input').value.split(':'); const h = +v[0], m = +(v[1] || 0); if (h >= 0 && h < 24 && m >= 0 && m < 60) { pc.setClock(h, m); P.log('CMD', `SIM: jam diatur ${v.join(':')}`); } },
+      { extra: `<div class="drow"><span class="grow"></span><input type="text" value="${String(Math.floor(t / 3600)).padStart(2, '0')}:${String(Math.floor(t / 60) % 60).padStart(2, '0')}"></div>`, okText: 'SET' }); },
+    wlcsp: () => { const w = PC().wlc; numDlg('WATER LEVEL SET POINT', 'Intake dam (El. m)', f(w.sp, 2), 'Elm', 0.05, (v) => { w.sp = Math.max(577.6, Math.min(579.1, v)); P.log('CMD', `PLANT: WLC set point ${w.sp.toFixed(2)} m`); }); },
+    // daily power operation
+    dpo: ([k]) => {
+      const pc = PC(), d = pc.dpo;
+      if (k === 'calc') { pc.calc(); return; }
+      if (k === 'meas') { d.inflow = Math.round(DAM().qnEst * 100) / 100; return; }
+      const lim = { inflow: [0, 500, 'm3/sec', 0.1], bias: [-50, 50, 'm3/sec', 0.1], P: [0, 210, 'MW', 5], start: [0, 23, ':00', 1], next: [1, 24, 'Hr', 1] }[k];
+      numDlg('CALCULATION PARAMETER', k.toUpperCase(), d[k], lim[2], lim[3], (v) => { d[k] = Math.max(lim[0], Math.min(lim[1], k === 'start' || k === 'next' ? Math.round(v) : v)); });
+    },
+    // bendungan
+    damset: ([k, i]) => { const d = DAM(); i = +i;
+      if (k === 'flap') numDlg('SPILLWAY FLAP GATE', `FLAP GATE -${i + 1} SET POS. (%)\n(spillway gate otomatis tetap aktif bila AUTO)`, f(d.flapSet[i], 0), '%', 5, (v) => { d.flapSet[i] = Math.max(0, Math.min(100, v)); P.log('CMD', `DAM: flap gate-${i + 1} → ${d.flapSet[i]} %`); });
+      else if (k === 'sg') numDlg('SPILLWAY GATE', `SPILLWAY GATE -${i + 1} SET POS. (cm)\nMode spillway: ${d.sgMode}${d.sgMode === 'AUTO' ? ' – set manual akan ditimpa kontrol otomatis saat WL > FSL' : ''}`, f(d.sgSet[i] * 100, 0), 'cm', 10, (v) => { d.sgSet[i] = Math.max(0, Math.min(600, v)) / 100; P.log('CMD', `DAM: spillway gate-${i + 1} → ${v} cm`); });
+      else if (k === 'rg') numDlg('REREGULATING GATE', `SET POS. (cm)\nMode: ${d.rMode}${d.rMode === 'AUTO' ? ' – akan ditimpa kontrol otomatis' : ''}`, f(d.rgSet * 100, 0), 'cm', 5, (v) => { d.rgSet = Math.max(0, Math.min(800, v)) / 100; P.log('CMD', `DAM: regulating gate → ${v} cm`); });
+    },
     dam: (r) => {
       const d = DAM(), k = r[0];
       if (k === 'sgmode') { d.sgMode = r[1]; P.log('CMD', `DAM: spillway gate ${r[1]}`); }
@@ -487,22 +930,12 @@
       else if (k === 'rqnd') d.rQn = Math.max(0, d.rQn + +r[1]);
       else if (k === 'plan') d.plannedRWL = Math.max(150, Math.min(157.5, d.plannedRWL + +r[1]));
       else if (k === 'inflow' || k === 'rqn') {
-        const isI = k === 'inflow', cur = isI ? P.inflow : d.rQn;
-        dialog('SET POINT', isI ? 'Inflow alami intake dam (m³/s)' : 'Aliran alami re-regulating dam Qn (m³/s)', () => { const v = parseFloat(document.querySelector('#dX input').value); if (!isNaN(v) && v >= 0) { if (isI) P.inflow = v; else d.rQn = v; P.log('CMD', `DAM: ${isI ? 'inflow' : 'Qn'} = ${v} m³/s`); } },
-          { extra: `<div class="drow"><span class="grow"></span><input type="number" step="1" value="${cur}"> m³/s</div>`, okText: 'SET' });
+        const isI = k === 'inflow';
+        numDlg('SET POINT', isI ? 'Inflow alami intake dam (m³/s)' : 'Aliran alami re-regulating dam Qn (m³/s)', isI ? P.inflow : d.rQn, 'm³/s', 1, (v) => { if (v >= 0) { if (isI) { P.inflow = v; if (P.rain.base !== null) P.rain.base = v; } else d.rQn = v; P.log('CMD', `DAM: ${isI ? 'inflow' : 'Qn'} = ${v} m³/s`); } });
       }
     },
-    dpo: () => { const Dly = P.daily.constructor; P.daily = new Dly(P); },
+    airc: () => { const air = AIR(); dialog('AIR COMPRESSOR', air.u.map((a, i) => `UNIT NO.${i + 1}: AC1 ${a.c1.fail ? 'FAULT' : a.c1.run ? 'RUN' : 'STOP'} (${f(a.c1.hrs, 2)} h) · AC2 ${a.c2.fail ? 'FAULT' : a.c2.run ? 'RUN' : 'STOP'} (${f(a.c2.hrs, 2)} h)`).join('\n') + '\n\nKompresor otomatis: start saat 63AQH1 OFF, stop saat 63AQH2 ON.\nGangguan kompresor: FAULT SIM. → "Air compressor 1 unit No.1 gagal".', null); },
+    rain: ([I]) => { RAIN().set(+I); },
   });
 
-  /* ============================== MENU YANG MENUNGGU DATA ============================== */
-  Object.assign(NA_MSG, {
-    'Air Supply System': 'AIR SUPPLY SYSTEM belum aktif.\n\nData yang dibutuhkan: jumlah & kapasitas kompresor, tekanan kerja receiver (governor HP air, rem, service air), setpoint start/stop kompresor, batas alarm tekanan rendah, dan screenshot layar OPS.',
-    'Rain Fall Monitor': 'RAIN FALL MONITOR belum aktif.\n\nData yang dibutuhkan: nama stasiun hujan, satuan & interval data, contoh data atau screenshot layar OPS.',
-    'Schedule(Rainy/Weekday)': 'SCHEDULE belum aktif.\n\nData yang dibutuhkan: tabel jadwal beban per jam (MW per unit / total) untuk Rainy/Dry × Weekday/Weekend, dan screenshot layar schedule.',
-    'Schedule(Rainy/Weekend)': 'SCHEDULE belum aktif.\n\nData yang dibutuhkan: tabel jadwal beban per jam (MW per unit / total) untuk Rainy/Dry × Weekday/Weekend, dan screenshot layar schedule.',
-    'Schedule(Dry/Weekday)': 'SCHEDULE belum aktif.\n\nData yang dibutuhkan: tabel jadwal beban per jam (MW per unit / total) untuk Rainy/Dry × Weekday/Weekend, dan screenshot layar schedule.',
-    'Schedule(Dry/Weekend)': 'SCHEDULE belum aktif.\n\nData yang dibutuhkan: tabel jadwal beban per jam (MW per unit / total) untuk Rainy/Dry × Weekday/Weekend, dan screenshot layar schedule.',
-    'Schedule(Arbitrary Setup)': 'SCHEDULE (ARBITRARY SETUP) belum aktif.\n\nData yang dibutuhkan: format layar arbitrary setup dan logika SCH (cara jadwal diterapkan ke ALR set point tiap unit).',
-  });
 })();
