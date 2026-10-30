@@ -383,10 +383,10 @@
   }
 
   /* ============================== LAYAR SISTEM UNIT – DIAGRAM ASLI OPS + OVERLAY DINAMIS ============================== */
-  // Diagram statis (jalur pipa, simbol, label) diambil langsung dari layar OPS 13-Okt-2017 (www/img/*.png) supaya jalur identik.
+  // Diagram statis vektor (js/ops-static.js) digambar ulang mengikuti geometri layar OPS 13-Okt-2017: koordinat garis diukur dari layar asli.
   // Semua elemen yang berubah (valve, pompa, lamp, nilai) digambar ulang di atasnya pada koordinat piksel layar asli.
   const BG = { ivh: { w: 928, h: 605 }, tact: { w: 1162, h: 757 }, ovw: { w: 1159, h: 756 } };
-  const bgWrap = (k, ttl, inner) => { const b = BG[k], s = 990 / b.w; return `<g transform="scale(${s.toFixed(5)})"><image href="img/${k}.png" x="0" y="0" width="${b.w}" height="${b.h}"/>${inner}</g>` + title(ttl) + backBtn(); };
+  const bgWrap = (k, ttl, inner) => { const b = BG[k], s = 990 / b.w; return `<g transform="scale(${s.toFixed(5)})">${(window.OPS_STATIC || {})[k] || ''}${inner}</g>` + title(ttl) + backBtn(); };
   const tx = (x, y, s, sz, anc = 'start', col = '#e8e8e8', ex = '') => `<text x="${x}" y="${y}" style="font-size:${sz}px;fill:${col};text-anchor:${anc}${ex}">${esc(String(s))}</text>`;
   const blk = (x, y, w, h, c = '#000') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`;
   // lamp OPS: hijau = normal, merah = alarm
