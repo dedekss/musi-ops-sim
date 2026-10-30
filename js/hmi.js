@@ -390,14 +390,14 @@
       ['GUIDE VANE LIMIT', f(m.gvLim), '%'], ['SPARE', '0', ''], ['EXCITATION CURRENT', f(m.If, 0), 'A'], ['EXCITATION VOLTAGE', f(m.Vf), 'V'], ['TURBINE WATER FLOW', f(m.flow), 'm3/s'], ['M.TR PRESSURE TRANSMITTER', '10.0', 'bar']];
     const ai2 = [['VIBRATION FOR UPPER BRACKET - VERTICAL', f(v.ubv, 0), 'µm pk-pk'], ['VIBRATION FOR UPPER BRACKET - HORIZONTAL', f(v.ubh, 0), 'µm pk-pk'], ['VIBRATION FOR LOWER BRACKET - VERTICAL', f(v.lbv, 0), 'µm pk-pk'],
       ['VIBRATION FOR LOWER BRACKET - HORIZONTAL', f(v.lbh, 0), 'µm pk-pk'], ['VIBRATION FOR HEAD COVER - VERTICAL', f(v.hcv), 'mm/s pk'], ['VIBRATION FOR HEAD COVER - HORIZONTAL', f(v.hch), 'mm/s pk'],
-      ['M.TR ROOM AMBIENT TEMPERATURE', '37.5', '℃'], ['M.TR COOLING WATER FLOW', f(p.f_ac * 0.0, 1), 'm3/s'], ['SPIRAL CASE PRESSURE', f(m.spiral), 'mWC'], ['PENSTOCK PRESSURE', f(m.penstock), 'mWC'],
+      ['M.TR ROOM AMBIENT TEMPERATURE', f(P.pc.amb('mtr' + n)), '℃'], ['M.TR COOLING WATER FLOW', f((p.mtr[0].run || p.mtr[1].run) ? 52.0 * Math.min(1, Math.max(0.2, p.f_ac || 1)) / 3600 : 0, 3), 'm3/s'], ['SPIRAL CASE PRESSURE', f(m.spiral), 'mWC'], ['PENSTOCK PRESSURE', f(m.penstock), 'mWC'],
       ['SHAFT RUN-OUT FOR UPPER GUIDE - X', f(v.ugx), 'µm pk-pk'], ['SHAFT RUN-OUT FOR UPPER GUIDE - Y', f(v.ugy), 'µm pk-pk'], ['SHAFT RUN-OUT FOR LOWER GUIDE - X', f(v.lgx), 'µm pk-pk'],
       ['SHAFT RUN-OUT FOR LOWER GUIDE - Y', f(v.lgy), 'µm pk-pk'], ['SHAFT RUN-OUT FOR TURBINE GUIDE - X', f(v.tgx), 'µm pk-pk'], ['SHAFT RUN-OUT FOR TURBINE GUIDE - Y', f(v.tgy), 'µm pk-pk']];
     const rtd = [['GEN. STATOR WINDING TEMPERATURE - 1', T_.st[0]], ['GEN. STATOR WINDING TEMPERATURE - 2', T_.st[1]], ['GEN. STATOR WINDING TEMPERATURE - 3', T_.st[2]], ['GEN. STATOR WINDING TEMPERATURE - 4', T_.st[3]],
       ['GEN. THRUST BEARING METAL TEMPERATURE', T_.thrust], ['GEN. UPPER GUIDE BEARING METAL TEMPERATURE', T_.ugb], ['GEN. LOWER GUIDE BEATING METAL TEMPERATURE - 1', T_.lgb], ['GEN. LOWER GUIDE BEATING METAL TEMPERATURE - 2', T_.lgb + 1.8],
       ['GEN. UPPER GUIDE BEARING OIL TEMPERATURE', T_.ugbOil], ['GEN. LOWER GUIDE BEARING OIL TEMPERATURE', T_.lgbOil], ['GEN. AIR COOLER AIR OUTLET TEMPERATURE', T_.acOut], ['GEN. AIR COOLER AIR INLET TEMPERATURE', T_.acIn],
       ['TURBINE GUIDE BEARING METAL TEMPERATURE', T_.tgb], ['TURBINE GUIDE BEARING OIL TEMPERATURE', T_.tgbOil], ['COOLING WATER OUTLET TEMPERATURE', T_.cwOut]];
-    const rtd2 = [['COOLING WATER INLET TEMPERATURE', T_.cwIn], ['MAIN TRANSFORMER WINDING TEMPERAURE', T_.mtrWdg], ['MAIN TRANSFORMER OIL TEMPERAURE', T_.mtrOil], ['GENERATOR ROOM', 36.5]];
+    const rtd2 = [['COOLING WATER INLET TEMPERATURE', T_.cwIn], ['MAIN TRANSFORMER WINDING TEMPERAURE', T_.mtrWdg], ['MAIN TRANSFORMER OIL TEMPERAURE', T_.mtrOil], ['GENERATOR ROOM', P.pc.amb('uph') + 2.5]];
     const RH = 17.5;
     const tbl = (x, y, rows, pre, w1, w2, unitDefault) => rows.map((r, i) => { const yy = y + i * RH; return R(x, yy, 62, RH, 'box') + T(x + 3, yy + 12.5, `${n}${pre}${String(i + 1).padStart(4, '0')}`, 'ts') + R(x + 62, yy, w1 - 62, RH, 'box') + T(x + 66, yy + 12.5, r[0], 'ts') +
       R(x + w1 + 10, yy, w2, RH, 'box') + T(x + w1 + w2 - 40, yy + 12.5, typeof r[1] === 'number' ? f(r[1]) : r[1], 'ts tr') + T(x + w1 + w2 - 34, yy + 12.5, r[2] !== undefined ? r[2] : unitDefault, 'ts'); }).join('');
@@ -409,10 +409,11 @@
 
   /* =========================== WATER FLOW / OVERVIEW =========================== */
   function scrOvw(n) {
+    if (window.HMIX_OVW) return window.HMIX_OVW(n);
     const u = U(n), p = u.p, m = u.meas(), T_ = p.T; let g = title(`NO.${n} UNIT WATER FLOW SYSTEM`) + backBtn();
     const rows = [['ACTIVE POWER', f(m.p), 'MW'], ['REACTIVE POWER', f(m.q), 'MVar'], ['TURBINE SPEED', f(m.rpm), 'RPM'], ['GUIDE VANE POS.', f(m.gv), '%'], ['LOAD LIMITER POS.', f(m.gvLim), '%'], ['TURBINE WATER FLOW', f(m.flow), 'm3/s'],
       ['COOLING WATER OUTLET', f(T_.cwOut), '℃'], ['COOLING WATER INLET', f(T_.cwIn), '℃'], ['TURB. GUIDE BRG MTL TEMP', f(T_.tgb), '℃'], ['TURB. GUIDE BRG OIL TEMP', f(T_.tgbOil), '℃'], ['PENSTOCK PRESSURE', f(m.penstock), 'mWC'],
-      ['SPIRAL CASE PRESSURE', f(m.spiral), 'mWC'], ['M.TR COOLING WATER FLOW', '?', 'm3/h']];
+      ['SPIRAL CASE PRESSURE', f(m.spiral), 'mWC'], ['M.TR COOLING WATER FLOW', f(52), 'm3/h']];
     g += T(14, 46, `UNIT No.${n}`, 'ts');
     rows.forEach((r, i) => { const y = 52 + i * 18.8; g += R(10, y, 165, 18.8) + T(14, y + 13.5, r[0], 'ts') + R(175, y, 82, 18.8) + T(232, y + 13.5, r[1], 'ts tr') + T(236, y + 13.5, r[2], 'ts'); });
     [['INTAKE WATER LEVEL', f(P.intakeWL, 2), 'Elm'], ['TAILRACE LEVEL', '173.5', 'Elm']].forEach((r, i) => { const y = 304 + i * 18.8; g += R(10, y, 165, 18.8) + T(14, y + 13.5, r[0], 'ts') + R(175, y, 82, 18.8) + T(232, y + 13.5, r[1], 'ts tr') + T(236, y + 13.5, r[2], 'ts'); });
@@ -513,12 +514,12 @@
     g += L(x - 37, 277, x - 37, 331, lc(lv.A)) + L(x + 38, 299, x + 38, 331, lc(lv.B)) + ds(x - 37, 331, '189-LSTA', '', 0) + T(x - 25, 318, '189-LSTA', 't') + ds(x + 38, 331, '189-LSTB', '', 0) + T(x + 50, 318, '189-LSTB', 't');
     g += PL([[x - 37, 339], [x - 37, 356], [x + 38, 356], [x + 38, 339]], lc(liveL)) + L(x, 356, x, 372, lc(liveL)) + cb(x, 381, '152-LST', '152-LST') + T(x + 50, 399, `${f(st['152-LST'] && liveL ? 2.1 : 0)}  A`, 't tr');
     g += L(x, 390, x, 435, lc(st['152-LST'] && liveL)) + `<circle cx="${x}" cy="443" r="9" fill="none" stroke="#ff2020" stroke-width="1.5"/><circle cx="${x}" cy="461" r="9" fill="none" stroke="#ff9a2a" stroke-width="1.5"/><circle cx="${x + 17}" cy="452" r="9" fill="none" stroke="#ff9a2a" stroke-width="1.5"/>`;
-    g += L(x, 470, x, 505, 'lno') + T(x + 30, 437, 'LSTr', 'ts') + T(x + 30, 450, 'OIL', 'ts') + T(x + 100, 450, '44.0 ℃', 'ts tr') + T(x + 30, 465, 'WDG', 'ts') + T(x + 100, 465, '43.2 ℃', 'ts tr');
+    g += L(x, 470, x, 505, 'lno') + T(x + 30, 437, 'LSTr', 'ts') + T(x + 30, 450, 'OIL', 'ts') + T(x + 100, 450, f(P.pc.amb('lstOil')) + ' ℃', 'ts tr') + T(x + 30, 465, 'WDG', 'ts') + T(x + 100, 465, f(P.pc.amb('lstWdg')) + ' ℃', 'ts tr');
     g += T(907, 400, 'TAP POSITION', 'ts') + R(907, 405, 68, 23) + T(941, 421, sy.tap, 't tc') + T(795, 517, 'to 20kV CUBICLE', 'ts') + T(795, 529, 'IN MAIN CONTROL HOUSE', 'ts');
     // ambient
     g += T(143, 482, 'AMBIENT TEMP', 'ts') + R(140, 487, 210, 140);
-    [['M.Tr No.1', '?'], ['M.Tr No.2', '37.5'], ['M.Tr No.3', '?'], ['OUTDOOR SWITCHYARD', '32.9'], ['MAIN CONTROL HOUSE', '?'], ['UNDER. POWERHOUSE', '36.6']].forEach((r, i) => { g += T(145, 506 + i * 23, r[0], 'ts') + T(340, 506 + i * 23, r[1] + ' ℃', 'ts tr'); });
-    g += b3(10, 537, 105, 28, 'FLICKER RESET', '', 'annack:SY') + `<g class="nav" data-a="nav:ctl${curU}">${R(13, 577, 102, 50)}${mline(64, 603, 'SWITCHYARD/\nSTATION SERVICE\nCONTROL PANEL', '', 10)}</g>`;
+    [['M.Tr No.1', f(P.pc.amb('mtr1'))], ['M.Tr No.2', f(P.pc.amb('mtr2'))], ['M.Tr No.3', f(P.pc.amb('mtr3'))], ['OUTDOOR SWITCHYARD', f(P.pc.amb('out'))], ['MAIN CONTROL HOUSE', f(P.pc.amb('mch'))], ['UNDER. POWERHOUSE', f(P.pc.amb('uph'))]].forEach((r, i) => { g += T(145, 506 + i * 23, r[0], 'ts') + T(340, 506 + i * 23, r[1] + ' ℃', 'ts tr'); });
+    g += b3(10, 537, 105, 28, 'FLICKER RESET', '', 'annack:SY') + `<g class="nav" data-a="nav:ssc">${R(13, 577, 102, 50)}${mline(64, 603, 'SWITCHYARD/\nSTATION SERVICE\nCONTROL PANEL', '', 10)}</g>`;
     g += T(980, 638, 'Klik DS/CB untuk select → execute (dengan interlock).', 'dim tr', 'style="font-size:9.5px"');
     return g;
   }

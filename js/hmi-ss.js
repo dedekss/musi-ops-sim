@@ -382,120 +382,100 @@
       <div class="row">${sb('INTAKE & RE-DAM ▶', 'nav:dam')}${sb('TREND PLANT ▶', 'nav:trend')}</div></div></div>`;
   }
 
-  const GVL = {};
-  /* ============================== HYDRAULIC TURBINE ACTUATOR CONTROL SYSTEM (layar 00011) ============================== */
-  function scrTact(n) {
-    const u = U(n), p = u.p, F = u.fx, lo = !!(u.lo['86-1'] || u.lo['86-2']); let g = title(`NO.${n} UNIT HYDRAULIC TURBINE ACTUATOR CONTROL SYSTEM`) + backBtn();
-    const sumpT = u.govSumpT ? u.govSumpT() : 45, run = p.speed > 0.05;
-    // rem generator 75S
-    g += mline(28, 66, 'GENERATOR\nBRAKE SOLENOID VALVE', 't', 11) + T(62, 92, '75S', 't');
-    g += L(28, 114, 62, 114, 'ln') + sol(68, 114, p.brakeCmd === 'apply' || p.brake > 0.5) + L(74, 114, 112, 114, 'ln') + arrowR(112, 114) + mline(118, 117, 'to GENERATOR\nBRAKE', 't', 11);
-    g += L(68, 120, 68, 157, 'ln') + L(68, 157, 112, 157, 'ln') + mline(118, 161, 'from BRAKE\nAIR TANK', 't', 11);
-    // GV position
-    g += R(240, 48, 168, 40, 'box') + T(248, 63, 'to WICKET GATE SERVOMOTOR', 't') + T(248, 81, `GUIDE VANE POS.   ${f(p.gv)}  %`, 't') + T(413, 52, 'CLOSE', 't') + T(413, 71, 'OPEN', 't');
-    g += L(408, 56, 470, 56, 'ln') + L(408, 74, 450, 74, 'ln') + L(470, 56, 470, 180, 'ln') + L(450, 74, 450, 180, 'ln');
-    // 20ST
-    g += mline(258, 128, 'TURBINE\nSTART/STOP\nSOLENOID VALVE\n20ST', 't', 11) + T(230, 179, 'START', 't') + T(300, 179, 'STOP', 't');
-    g += sol(268, 182, p.govOn) + L(248, 182, 262, 182, 'ln') + L(274, 182, 290, 182, 'ln') + L(268, 188, 268, 297, 'ln') + vlv(268, 230, true) + L(240, 190, 240, 202, 'ln');
-    // header tekanan
-    g += L(330, 150, 650, 150, 'ln') + L(350, 150, 350, 300, 'ln') + L(390, 150, 390, 300, 'ln') + L(610, 150, 610, 300, 'ln') + L(650, 40, 650, 330, 'ln') + L(650, 40, 790, 40, 'ln');
-    [390, 610].forEach((x) => { g += vlv(x, 183, true) + R(x + 4, 178, 8, 10, 'box'); });
-    [425, 470, 518, 563].forEach((x) => { g += vlv(x, 238, true) + L(x, 210, x, 300, 'ln'); });
-    g += L(425, 210, 563, 210, 'ln') + R(640, 238, 18, 16, 'box') + L(643, 241, 655, 251, 'ln') + L(655, 241, 643, 251, 'ln');
-    // 650G distributing valve
-    const gvMove = Math.abs((GVL[n] === undefined ? p.gv : GVL[n]) - p.gv) > 0.01; GVL[n] = p.gv;
-    g += `<g transform="translate(493,303)"><path d="M-18,-8 L18,8 M-18,8 L18,-8 M-8,-18 L8,18 M8,-18 L-8,18" stroke="${C.wht}" stroke-width="1.4"/><circle r="5" fill="${gvMove ? C.yel : '#000'}" stroke="${C.wht}"/></g>` + `<path d="M480,282 Q493,270 506,282" fill="none" stroke="${C.wht}"/>` + T(493, 268, '650G', 't tc');
-    g += L(470, 180, 470, 285, 'ln') + L(450, 180, 450, 290, 'ln') + L(320, 300, 650, 300, 'ln');
-    // 20SD emergency stop & overspeed
-    g += T(730, 127, '20SD', 't') + sol(722, 147, !lo) + L(650, 147, 716, 147, 'ln') + L(728, 147, 790, 147, 'ln') + L(722, 153, 722, 175, 'ln') + L(722, 175, 735, 183, 'ln');
-    g += mline(708, 196, 'EMERGENCY\nSTOP SOLENOID\nVALVE', 't', 11);
-    g += L(790, 40, 790, 200, 'ln') + vlv(790, 62, false) + L(796, 62, 840, 62, 'ln') + `<g><circle cx="855" cy="62" r="9" fill="none" stroke="${p.speed > 1.4 ? C.red : C.grn}" stroke-width="2"/><path d="M842,57 l-6,5 l6,5" fill="none" stroke="${p.speed > 1.4 ? C.red : C.grn}"/>${L(836, 62, 846, 62, '')}</g>`;
-    g += mline(815, 86, 'MECHANICAL OVERSPEED\nPENDULUM', 't', 11);
-    // 20MC / 20TV
-    const man = u.ctrl && u.ctrl.govRemote === false;
-    g += T(773, 233, 'OPEN', 't') + T(852, 233, 'CLOSE', 't') + `<g transform="translate(808,250)"><path d="M-14,-6 L14,6 M-14,6 L14,-6 M-6,-14 L6,14 M6,-14 L-6,14" stroke="${C.wht}" stroke-width="1.3"/></g>`;
-    g += `<circle cx="785" cy="250" r="5" fill="none" stroke="${C.wht}"/>` + T(785, 253, 'S', 'ts tc', 'style="font-size:7px"') + `<circle cx="831" cy="250" r="5" fill="none" stroke="${C.wht}"/>` + T(831, 253, 'S', 'ts tc', 'style="font-size:7px"');
-    g += T(842, 252, '20MC', 't') + mline(843, 275, 'MANUAL GUIDE VANE\nOPEN/CLOSE', 't', 11) + L(790, 200, 808, 236, 'ln') + L(808, 264, 808, 300, 'ln') + L(835, 200, 835, 320, 'ln');
-    g += T(800, 286, 'MAN', 't') + T(842, 306, '20TV', 't') + mline(845, 327, 'MANUAL/AUTO\nSELECTION VALVE', 't', 11) + T(793, 348, 'AUTO', 't');
-    g += `<path d="M800,309 L800,321 L820,309 L820,321 Z" fill="${man ? C.red : C.grn}" stroke="${man ? C.red : C.grn}"/><circle cx="826" cy="315" r="5" fill="${C.red}" stroke="${C.red}"/>` + T(826, 318, 'S', 'ts tc', 'style="font-size:7px"') + L(808, 300, 812, 309, 'ln') + L(810, 321, 810, 375, 'ln');
-    // 20QMV
-    g += sol(675, 385, p.govOn, true) + T(700, 389, '20QMV', 't') + L(650, 330, 650, 420, 'ln') + L(650, 385, 669, 385, 'ln') + L(681, 385, 810, 385, 'ln') + L(320, 420, 650, 420, 'ln');
-    // governor pressure tank
-    g += lampBox(10, 246, 150, [['71QPA', p.govLvl < 0.85 || p.govLvl > 1.08 ? 'alm' : true], ['71QPL-1', p.govLvl < 0.85 ? 'alm' : true], ['71QPL-2', p.govLvl < 0.75 ? 'alm' : true]]).replace(/width="150"/, 'width="150"');
-    g += [['63QH', p.govP > 1.05 ? 'alm' : true], ['63QL-1', p.govP < 0.85 ? 'alm' : true], ['63QL-2', p.govP < 0.75 ? 'alm' : true]].map(([lab, s0], i) => lampS(97, 257 + i * 16, s0) + T(109, 261 + i * 16, lab, 't')).join('') + L(85, 248, 85, 298, 'ln');
-    g += `<rect x="195" y="292" width="46" height="62" rx="10" fill="url(#gTank)" stroke="${C.wht}"/><defs><linearGradient id="gTank"><stop offset="0" stop-color="#555"/><stop offset=".5" stop-color="#ddd"/><stop offset="1" stop-color="#555"/></linearGradient></defs>`;
-    g += L(200, 354, 200, 362, 'ln') + L(235, 354, 235, 362, 'ln') + relief(240, 292) + mline(232, 263, 'GOVERNOR\nPRESSURE\nTANK', 't', 11) + T(218, 330, `${f(p.govP * 100, 0)}%`, 'ts tc', 'style="fill:#000"');
-    g += mline(14, 322, 'from\nPRIMARY\nAIR TANK', 't', 11) + L(14, 343, 120, 343, 'ln') + vlv(95, 343) + sol(130, 343, P.air && P.air.u[n - 1].prim > 0.5 && p.govLvl < 0.98) + L(136, 343, 182, 343, 'ln') + vlv(185, 343) + L(191, 343, 195, 343, 'ln') + T(132, 365, '20ASG', 't');
-    g += L(205, 362, 205, 410, 'ln') + vlv(205, 383, true) + L(230, 362, 230, 410, 'ln') + vlv(230, 383, true) + L(230, 410, 650, 410, 'ln');
-    // leakage tank
-    g += R(25, 548, 140, 62, '', `fill="${C.brn}" stroke="${C.wht}"`) + T(95, 601, 'LEAKAGE OIL TANK', 't tc') + pump(97, 571, F.gov_oil_leak && run, '', C.wht) + T(85, 575, '88LQ1', 't tr');
-    g += lampBox(100, 522, 62, [['71QLH', F.gov_oil_leak ? 'alm' : true]]);
-    g += L(45, 548, 45, 430, 'ln') + vlv(45, 500, true) + L(90, 548, 90, 430, 'ln') + vlv(90, 500, true) + L(45, 430, 190, 430, 'ln') + L(190, 430, 190, 420, 'ln') + `<path d="M135,426 l8,4 l-8,4 Z" fill="none" stroke="${C.wht}"/>`;
-    // sump & pompa
-    g += R(180, 548, 710, 62, '', `fill="${C.brn}" stroke="${C.wht}"`) + T(550, 601, 'OIL SUMP TANK FOR GOVERNOR OIL SYSTEM', 't tc') + T(260, 601, `${f(sumpT)} ℃`, 'ts', `style="fill:${sumpT > 60 ? '#ff8080' : '#ffd0a0'}"`);
-    g += lampBox(340, 515, 68, [['49QST1', p.qp[0].fail ? 'alm' : true], ['49QST1', p.qp[1].fail ? 'alm' : true]]) + lampBox(340, 557, 68, [['71QST1', F.gov_oil_leak ? 'alm' : true], ['71QST2', true], ['71QST3', true]]);
-    g += pump(518, 533, p.qp[0].run) + T(505, 537, '88QP1', 't tr') + pump(608, 533, p.qp[1].run) + T(595, 537, '88QP2', 't tr') + pump(742, 533, run && p.govOn, '', p.govOn ? C.red : C.wht) + T(785, 537, '88QP3', 't');
-    g += L(518, 524, 518, 470, 'ln') + vlv(518, 462, true) + L(518, 455, 518, 420, 'ln') + L(608, 524, 608, 470, 'ln') + vlv(608, 462, true) + L(608, 455, 608, 420, 'ln') + L(518, 490, 608, 490, 'ln') + `<path d="M540,486 l8,4 l-8,4 Z" fill="none" stroke="${C.wht}"/>` + vlv(565, 490);
-    g += L(518, 542, 518, 548, 'ln') + L(608, 542, 608, 548, 'ln') + L(742, 542, 742, 548, 'ln') + L(742, 524, 742, 475, 'ln');
-    [[285, 'A'], [315, 'B']].forEach(([x]) => { g += `<circle cx="${x}" cy="533" r="8" fill="none" stroke="${C.wht}"/>` + L(x - 6, 533, x + 6, 533, 'ln') + L(x, 525, x, 470, 'ln') + L(x, 541, x, 548, 'ln'); });
-    g += L(285, 470, 315, 470, 'ln') + `<circle cx="300" cy="455" r="7" fill="none" stroke="${C.wht}"/>` + L(300, 448, 300, 430, 'ln');
-    g += L(405, 470, 450, 470, 'ln') + `<circle cx="405" cy="463" r="7" fill="none" stroke="${C.wht}"/><circle cx="450" cy="463" r="7" fill="none" stroke="${C.wht}"/><circle cx="428" cy="485" r="7" fill="none" stroke="${C.wht}"/>` + L(428, 420, 428, 445, 'ln');
-    // cooler
-    g += `<circle cx="693" cy="475" r="11" fill="none" stroke="${C.wht}"/><path d="M684,481 Q693,462 702,481" fill="none" stroke="${C.wht}"/>` + L(704, 475, 900, 475, 'ln') + L(693, 486, 693, 493, 'ln') + L(693, 493, 900, 493, 'ln') + vlv(820, 448) + vlv(820, 493) + vlv(775, 493, false) + T(860, 444, 'COOLING WATER', 't') + T(860, 456, 'OUTLET', 't') + T(860, 489, 'COOLING WATER', 't') + T(860, 501, 'INLET', 't');
-    g += L(693, 464, 693, 448, 'ln') + L(693, 448, 900, 448, 'ln') + L(742, 475, 742, 448, '');
-    g += T(495, 632, 'Merah = solenoid energize / pompa jalan · hijau = pompa siaga / posisi AUTO. Tekanan tangki: % nominal (nilai MPa tidak ada di layar).', 'ts tc dim');
-    return g;
+  /* ============================== LAYAR SISTEM UNIT – DIAGRAM ASLI OPS + OVERLAY DINAMIS ============================== */
+  // Diagram statis (jalur pipa, simbol, label) diambil langsung dari layar OPS 13-Okt-2017 (www/img/*.png) supaya jalur identik.
+  // Semua elemen yang berubah (valve, pompa, lamp, nilai) digambar ulang di atasnya pada koordinat piksel layar asli.
+  const BG = { ivh: { w: 928, h: 605 }, tact: { w: 1162, h: 757 }, ovw: { w: 1159, h: 756 } };
+  const bgWrap = (k, ttl, inner) => { const b = BG[k], s = 990 / b.w; return `<g transform="scale(${s.toFixed(5)})"><image href="img/${k}.png" x="0" y="0" width="${b.w}" height="${b.h}"/>${inner}</g>` + title(ttl) + backBtn(); };
+  const tx = (x, y, s, sz, anc = 'start', col = '#e8e8e8', ex = '') => `<text x="${x}" y="${y}" style="font-size:${sz}px;fill:${col};text-anchor:${anc}${ex}">${esc(String(s))}</text>`;
+  const blk = (x, y, w, h, c = '#000') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`;
+  // lamp OPS: hijau = normal, merah = alarm
+  const lampO = (x, y, alarm, r = 5.5) => `<circle cx="${x}" cy="${y}" r="${r + 1.5}" fill="#000"/><circle cx="${x}" cy="${y}" r="${r}" fill="${alarm ? '#ff2020' : '#18e018'}"/>`;
+  // pompa OPS: lingkaran + panah; merah = jalan, hijau = berhenti, kuning = gangguan
+  const pumpO = (x, y, st, dir = 'up', r = 9) => {
+    const c = st === 'run' ? '#ff2020' : st === 'fail' ? '#ffd000' : '#18e018';
+    const a = { up: `M${x},${y + 6} L${x},${y - 1} M${x - 5},${y - 1} L${x},${y - 7} L${x + 5},${y - 1} Z`, right: `M${x - 6},${y} L${x + 1},${y} M${x + 1},${y - 5} L${x + 7},${y} L${x + 1},${y + 5} Z`, left: `M${x + 6},${y} L${x - 1},${y} M${x - 1},${y - 5} L${x - 7},${y} L${x - 1},${y + 5} Z` }[dir];
+    return `<circle cx="${x}" cy="${y}" r="${r + 2}" fill="#000"/><circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${c}" stroke-width="1.8"/><path d="${a}" fill="${c}" stroke="${c}" stroke-width="2.4"/>`;
+  };
+  // solenoid valve: bowtie + kumparan 'S'. on → merah; off → putih (seperti layar OPS)
+  const solO = (x, y, on, vert = false, sx = 0, sy = -12, col, hw = 8, hh = 6, sr = 5) => {
+    const c = col || (on ? '#ff2020' : '#e8e8e8');
+    const [a1, a2] = vert ? [hh, hw] : [hw, hh];
+    const bt = vert ? `M${x - a1},${y - a2} L${x + a1},${y - a2} L${x - a1},${y + a2} L${x + a1},${y + a2} Z` : `M${x - a1},${y - a2} L${x - a1},${y + a2} L${x + a1},${y - a2} L${x + a1},${y + a2} Z`;
+    return `<rect x="${x - a1 - 1.5}" y="${y - a2 - 1.5}" width="${2 * a1 + 3}" height="${2 * a2 + 3}" fill="#000"/><circle cx="${x + sx}" cy="${y + sy}" r="${sr + 1.5}" fill="#000"/>` +
+      `<path d="${bt}" fill="none" stroke="${c}" stroke-width="1.5"/><line x1="${x}" y1="${y}" x2="${x + sx * 0.55}" y2="${y + sy * 0.55}" stroke="${c}" stroke-width="1.2"/>` +
+      `<circle cx="${x + sx}" cy="${y + sy}" r="${sr}" fill="none" stroke="${c}" stroke-width="1.3"/>` + tx(x + sx, y + sy + sr * 0.6, 'S', sr * 1.5, 'middle', c);
+  };
+
+  /* ---------- NO.n UNIT INLET VALVE HYDRAULIC CONTROL SYSTEM (00014–00016) ---------- */
+  function scrIVH(n) {
+    const u = U(n), p = u.p, F = u.fx, air = P.air ? P.air.u[n - 1] : { iv: 1 }, lo = !!(u.lo['86-1'] || u.lo['86-2']);
+    const ivP = Math.min(1.02, 0.6 + 0.42 * air.iv), moving = (p.ivCmd === 'open' && p.iv < 0.995) || (p.ivCmd === 'close' && p.iv > 0.005);
+    let g = '';
+    [[56, ivP < 0.85 || ivP > 1.06], [72, ivP < 0.85], [87, ivP < 0.75], [114, ivP > 1.05], [130, ivP < 0.85], [146, ivP < 0.75]].forEach(([y, a]) => { g += lampO(315, y, a); });
+    g += lampO(495, 504, false) + lampO(495, 519, false) + lampO(495, 550, false) + lampO(495, 566, false) + lampO(495, 581, !!F.iv_stuck);
+    g += solO(145, 109, ivP < 0.95, false, 0, -11);                                   // 20AJI air injection
+    g += solO(396, 132, p.bypassCmd, true, 10, 0);                                     // 20QIVBPI
+    g += solO(506, 132, p.ivCmd === 'open' && p.seal > 0.01 && p.iv < 0.995, true, 10, 0);   // 20QIVS1 (energize saat seal dilepas)
+    g += solO(769, 351, p.ivCmd === 'open' && p.iv < 0.995, true, 10, 0);             // 20QIV
+    g += solO(461, 395, p.ivCmd === 'open' && !lo, false, 0, -13, p.ivCmd === 'open' && !lo ? '#ff2020' : '#18e018', 14, 8.5, 6);   // 20QIVMSI
+    const bpO = p.bypass > 0.02, bc = bpO ? '#ff2020' : '#18e018';
+    g += blk(823, 156, 27, 30) + `<rect x="829" y="158" width="14" height="9" fill="none" stroke="${bc}" stroke-width="1.4"/><line x1="836" y1="167" x2="836" y2="176" stroke="${bc}"/>` +
+      `<path d="M823,170 L823,182 L849,170 L849,182 Z" fill="${bc}" stroke="${bc}"/>`;
+    const ivO = p.iv > 0.02;
+    g += `<path d="M742,245 L797,245 L791,260 L748,260 Z" fill="${ivO ? '#ff2020' : '#18e018'}"/>` + (p.iv > 0.005 && p.iv < 0.995 ? tx(769, 243, `${f(p.iv * 100, 0)}%`, 9, 'middle', '#000') : '');
+    const pr = moving && !F.iv_stuck;
+    g += pumpO(352, 518, pr ? 'run' : 'stop') + pumpO(439, 518, 'stop');
+    return bgWrap('ivh', `NO.${n} UNIT INLET VALVE HYDRAULIC CONTROL SYSTEM`, g);
   }
 
-  /* ============================== INLET VALVE HYDRAULIC CONTROL SYSTEM (layar 00014) ============================== */
-  function scrIVH(n) {
-    const u = U(n), p = u.p, F = u.fx, air = P.air ? P.air.u[n - 1] : { iv: 1 }; let g = title(`NO.${n} UNIT INLET VALVE HYDRAULIC CONTROL SYSTEM`) + backBtn();
-    const ivP = Math.min(1.02, 0.6 + 0.42 * air.iv), moving = (p.ivCmd === 'open' && p.iv < 0.995) || (p.ivCmd === 'close' && p.iv > 0.005) || (p.bypassCmd && p.bypass < 0.99);
-    g += mline(28, 112, 'from\nINLET\nVALVE\nAIR TANK', 't', 11) + L(85, 114, 210, 114, 'ln') + arrowR(100, 114) + vlv(110, 114) + sol(150, 114, ivP < 0.92) + T(145, 85, '20AJI', 't tc') + vlv(205, 114);
-    g += `<defs><linearGradient id="gTk2"><stop offset="0" stop-color="#555"/><stop offset=".5" stop-color="#ddd"/><stop offset="1" stop-color="#555"/></linearGradient><linearGradient id="gPipe" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#666"/><stop offset=".5" stop-color="#ddd"/><stop offset="1" stop-color="#666"/></linearGradient></defs>`;
-    g += `<rect x="215" y="78" width="47" height="62" rx="10" fill="url(#gTk2)" stroke="${C.wht}"/>` + T(238, 115, `${f(ivP * 100, 0)}%`, 'ts tc', 'style="fill:#000"') + relief(250, 78) + mline(208, 66, 'INLET VALVE\nPRESSURE TANK', 't tr', 11);
-    g += L(220, 140, 220, 148, 'ln') + L(255, 140, 255, 148, 'ln');
-    g += lampBox(313, 50, 67, [['71QVPA', true], ['71QVPL-1', ivP < 0.85 ? 'alm' : true], ['71QVPL-2', ivP < 0.75 ? 'alm' : true]]) + L(262, 85, 313, 85, 'ln');
-    g += lampBox(313, 112, 67, [['63QVH', ivP > 1.05 ? 'alm' : true], ['63QVL-1', ivP < 0.85 ? 'alm' : true], ['63QVL-2', ivP < 0.75 ? 'alm' : true]]) + L(262, 130, 313, 130, 'ln');
-    g += L(228, 148, 228, 545, 'ln') + vlv(228, 185, true) + L(255, 148, 255, 405, 'ln') + vlv(255, 185, true) + L(255, 405, 790, 405, 'ln');
-    // solenoid bypass & seal
-    g += mline(410, 100, 'BY-PASS VALVE\nOPEN/CLOSE\nSOLENOID VALVE', 't', 11) + sol(410, 140, p.bypassCmd, true) + T(432, 144, '20QIVBPI', 't');
-    g += mline(522, 90, 'SEAL CONTROL\nVALVE\nRELEASE/APPLY\nSOLENOID VALVE', 't', 11) + sol(520, 140, p.ivCmd === 'open' && p.seal < 0.995, true) + T(545, 144, '20QIVS1', 't');
-    g += L(405, 147, 405, 180, 'ln') + L(405, 180, 520, 180, 'ln') + L(520, 147, 520, 405, 'ln') + L(410, 132, 410, 50, 'ln') + L(410, 50, 860, 50, 'ln') + L(860, 50, 860, 168, 'ln');
-    g += L(520, 125, 520, 112, 'ln') + L(520, 112, 630, 112, 'ln') + L(630, 112, 630, 210, 'ln');
-    // seal loop dengan filter & valve
-    g += R(653, 70, 50, 90, 'boxd') + filt(676, 92) + filt(676, 138) + L(630, 112, 653, 112, 'ln') + L(703, 112, 755, 112, 'ln') + L(755, 112, 790, 112, 'ln') + vlv(790, 112) + L(796, 112, 860, 112, 'ln');
-    g += L(755, 112, 755, 210, 'ln') + vlv(755, 147, true) + L(820, 112, 820, 210, 'ln');
-    // badan valve & pipa
-    g += `<rect x="605" y="225" width="300" height="60" rx="8" fill="url(#gPipe)" stroke="#888"/><ellipse cx="790" cy="240" rx="55" ry="48" fill="url(#gPipe)" stroke="#888"/>`;
-    g += `<rect x="715" y="175" width="190" height="14" rx="6" fill="url(#gPipe)" stroke="#888"/><rect x="715" y="175" width="14" height="50" fill="url(#gPipe)" stroke="#888"/><rect x="891" y="175" width="14" height="50" fill="url(#gPipe)" stroke="#888"/>`;
-    const bpO = p.bypass > 0.02, ivO = p.iv > 0.02;
-    g += `<path d="M845,174 L845,190 L865,174 L865,190 Z" fill="${bpO ? C.red : C.grn}" stroke="#000"/>` + `<rect x="849" y="160" width="12" height="9" fill="${bpO ? C.red : C.grn}" stroke="#000"/>` + L(855, 169, 855, 174, 'ln');
-    g += `<g transform="rotate(${(1 - p.iv) * 90} 790 255)"><path d="M762,252 L818,252 L812,262 L768,262 Z" fill="${ivO ? C.red : C.grn}" stroke="#000"/></g>` + T(670, 248, 'FLOW', 't', 'style="fill:#000"') + `<path d="M670,256 L700,256 M694,252 L700,256 L694,260" stroke="#000" fill="none"/>`;
-    g += T(790, 215, `${f(p.iv * 100, 0)} %`, 'ts tc', 'style="fill:#000"');
-    // main valve solenoid
-    g += mline(795, 326, 'MAIN VALVE\nOPEN/CLOSE\nSOLENOID VALVE', 't', 11) + sol(790, 363, p.ivCmd === 'open', true) + T(818, 367, '20QIV', 't') + L(790, 290, 790, 345, 'ln') + L(790, 369, 790, 405, 'ln');
-    g += L(630, 210, 630, 225, 'ln');
-    // master solenoid & pompa
-    g += sol(473, 405, p.ivCmd === 'open' && !(u.lo['86-1'] || u.lo['86-2'])) + T(473, 375, '20QIVMSI', 't tc');
-    g += L(405, 405, 405, 430, 'ln') + L(270, 430, 448, 430, 'ln') + L(270, 430, 270, 548, 'ln') + L(448, 430, 448, 470, 'ln');
-    g += L(360, 430, 360, 524, 'ln') + vlv(360, 460, true) + L(345, 460, 345, 480, 'ln') + L(345, 480, 360, 480, 'ln') + L(450, 470, 450, 524, 'ln') + vlv(450, 460, true) + L(435, 460, 435, 480, 'ln') + L(435, 480, 450, 480, 'ln');
-    g += L(360, 505, 450, 505, 'ln') + `<path d="M380,501 l8,4 l-8,4 Z M425,501 l-8,4 l8,4 Z" fill="none" stroke="${C.wht}"/>` + L(405, 430, 405, 505, 'ln');
-    const pr = moving && !F.iv_stuck;
-    g += pump(362, 531, pr && p.ivPump !== 1, '88QVP1', undefined) + pump(452, 531, pr && p.ivPump === 1, '', undefined) + T(438, 535, '88QVP2', 't tr');
-    g += L(362, 540, 362, 548, 'ln') + L(452, 540, 452, 548, 'ln');
-    // pompa tangan & check valve (sekitar bypass)
-    g += `<circle cx="497" cy="270" r="9" fill="none" stroke="${C.wht}"/><circle cx="542" cy="270" r="9" fill="none" stroke="${C.wht}"/><circle cx="520" cy="292" r="8" fill="none" stroke="${C.wht}"/>` + L(488, 270, 506, 270, 'ln') + L(533, 270, 551, 270, 'ln') + L(497, 240, 542, 240, 'ln') + vlv(497, 252, true) + vlv(542, 252, true);
-    g += lampBox(497, 508, 63, [['49QIV1', true], ['49QIV2', true]]) + lampBox(497, 553, 63, [['71QIV6', true], ['71QIV7', true], ['71QIV8', true]]);
-    g += R(180, 548, 410, 62, '', `fill="${C.brn}" stroke="${C.wht}"`) + T(322, 601, 'OIL SUMP TANK FOR INLET VALVE', 't tc');
-    // nilai
-    const head = P.intakeWL - 173.5;
-    g += R(640, 440, 330, 120, 'boxd') + [['PENSTOCK PRESSURE', `${f(head * 0.967 + 0.5)} mWC`], ['SPIRAL CASE PRESSURE', `${f(head * (1 - p.dp * (p.iv < 0.01 ? 1 : 0)) * 0.97)} mWC`],
-      ['I/V ΔP (DIFFERENTIAL)', `${f(p.dp * 100)} %`], ['INLET VALVE', p.iv > 0.995 ? 'FULLY OPEN' : p.iv < 0.005 ? 'FULLY CLOSE' : `${f(p.iv * 100)} %`], ['BY-PASS VALVE', p.bypass > 0.995 ? 'FULLY OPEN' : p.bypass < 0.005 ? 'FULLY CLOSE' : `${f(p.bypass * 100)} %`],
-      ['OPERATING SEAL', p.seal > 0.99 ? 'APPLIED' : p.seal < 0.02 ? 'RELEASED' : 'BERGERAK']].map(([a, b], i) => T(650, 458 + i * 17, a, 't') + T(960, 458 + i * 17, b, 't tr cy')).join('');
-    g += T(495, 632, 'Merah = valve terbuka / solenoid energize · hijau = valve tertutup. Nilai tekanan simulator (head intake − tailrace 173.5 m).', 'ts tc dim');
-    return g;
+  /* ---------- NO.n UNIT HYDRAULIC TURBINE ACTUATOR CONTROL SYSTEM (00011–00013) ---------- */
+  function scrTact(n) {
+    const u = U(n), p = u.p, F = u.fx, lo = !!(u.lo['86-1'] || u.lo['86-2']), sumpT = u.govSumpT ? u.govSumpT() : 45;
+    let g = blk(429, 76, 38, 19) + tx(463, 91, f(p.gv), 12, 'end');
+    g += lampO(25, 325, p.govLvl < 0.85 || p.govLvl > 1.08, 6) + lampO(25, 343, p.govLvl < 0.85, 6) + lampO(25, 362, p.govLvl < 0.75, 6);
+    g += lampO(118, 325, p.govP > 1.05, 6) + lampO(118, 343, p.govP < 0.85, 6) + lampO(118, 362, p.govP < 0.75, 6);
+    g += lampO(135, 644, !!F.gov_oil_leak, 6) + lampO(427, 635, p.qp[0].fail, 6) + lampO(427, 654, p.qp[1].fail, 6);
+    g += lampO(427, 687, !!F.gov_oil_leak, 6) + lampO(427, 706, sumpT > 60, 6) + lampO(427, 726, sumpT > 65, 6);
+    // 75S rem: merah saat rem dilepas (kondisi operasi pada layar OPS), hijau saat rem diterapkan
+    g += solO(81, 136, true, false, 0, -16, p.brake > 0.5 ? '#18e018' : '#ff2020', 16, 10.5, 7.5);
+    g += solO(825, 467, true, true, 16, 0, p.govOn ? '#ff2020' : '#18e018', 16, 10.5, 7.5);                     // 20QMV
+    if (lo) g += solO(881, 174, true, false, 0, -12, '#ff2020');                                  // 20SD energize saat quick shutdown
+    if (p.govOn && p.speed < 0.95 && !p.cb) g += solO(324, 218, true, false, 0, -12, '#ff2020'); // 20ST saat start
+    if (p.speed > 1.4 || (u.lo['86-2'] && /overspeed|140|145/i.test(u.lo['86-2'] || ''))) g += blk(1017, 57, 50, 27) + `<path d="M1026,58 L1060,58 A12,12 0 0 1 1060,82 L1026,82 L1018,70 Z" fill="none" stroke="#ff2020" stroke-width="1.6"/><circle cx="1053" cy="70" r="6" fill="none" stroke="#ff2020" stroke-width="1.6"/><path d="M1044,70 L1030,70 M1034,66 L1030,70 L1034,74" stroke="#ff2020" fill="none"/>`;
+    const qst = (q) => q.fail ? 'fail' : q.run ? 'run' : 'stop';
+    g += pumpO(632, 648, qst(p.qp[0])) + pumpO(742, 648, qst(p.qp[1]));
+    if (F.gov_oil_leak && p.speed > 0.05) g += pumpO(108, 692, 'run');
+    return bgWrap('tact', `NO.${n} UNIT HYDRAULIC TURBINE ACTUATOR CONTROL SYSTEM`, g);
   }
+
+  /* ---------- NO.n UNIT WATER FLOW SYSTEM (00006–00008) ---------- */
+  function scrOvwOPS(n) {
+    const u = U(n), p = u.p, m = u.meas(), T_ = p.T;
+    let g = tx(16, 52, `UNIT No.${n}`, 12);
+    const head = P.intakeWL - 173.5;
+    const mtrFlow = (p.mtr[0].run || p.mtr[1].run) ? 52.0 * Math.min(1, Math.max(0.2, p.f_ac || 1)) + 0.4 * Math.sin(P.t / 37) : 0;
+    const L = [[71, f(m.p)], [92, f(m.q)], [115, f(m.rpm)], [137, f(m.gv)], [158, f(m.gvLim)], [180, f(m.flow), 'm3/s'], [203, f(T_.cwOut)], [224, f(T_.cwIn)], [246, f(T_.tgb)], [268, f(T_.tgbOil)],
+      [290, f(m.penstock)], [312, f(m.spiral)], [334, f(mtrFlow), 'm3/h'], [362, f(P.intakeWL, 2)], [383, f(173.5)]];
+    L.forEach(([y, v, unit]) => { const al = T_.tgb > 70 && y === 246; g += tx(249, y + 5, v, y === 362 ? 11 : 12, 'end', al ? '#ff4040' : '#e8e8e8') + (unit ? tx(296, y + 5, unit, 12, 'end') : ''); });
+    const R2 = [[72, T_.ugb], [92, T_.ugbOil], [120, T_.thrust], [142, T_.lgb], [163, T_.lgb + 1.8], [185, T_.lgbOil], [213, T_.acOut], [235, T_.acIn]];
+    R2.forEach(([y, v]) => { g += tx(567, y + 5, f(v), 12, 'end', v > 70 ? '#ff4040' : '#e8e8e8'); });
+    g += tx(813, 135, f(m.kv), 12, 'end');
+    [m.Ir, m.Is, m.It].forEach((v, i) => { g += tx(918, [135, 151, 168][i], f(v, 0), 12, 'end'); });
+    T_.st.forEach((v, i) => { g += tx(1015, [135, 151, 168, 184][i], f(v), 12, 'end', v > 110 ? '#ff4040' : '#e8e8e8'); });
+    g += tx(580, 457, f(T_.cwIn), 12, 'end') + tx(1090, 390, f(T_.cwOut), 12, 'end');
+    g += tx(901, 444, `No.${n}`, 11.5, 'middle', '#333', ';font-weight:bold');
+    const fr = (x, y, ok) => `<circle cx="${x}" cy="${y}" r="11" fill="#000"/><circle cx="${x}" cy="${y}" r="9.5" fill="${ok ? '#18e018' : '#ff2020'}"/><circle cx="${x}" cy="${y}" r="7.5" fill="none" stroke="#000" stroke-width=".8"/>` + tx(x, y + 3.5, 'FR', 8.5, 'middle', '#000');
+    g += fr(1081, 203, p.f_lb > 0.6) + fr(1081, 252, p.f_goc > 0.6) + fr(998, 302, p.f_tb > 0.6) + fr(806, 362, p.f_sc > 0.6);
+    // inlet valve & bypass (dilihat dari luar)
+    const bc = p.bypass > 0.02 ? '#ff2020' : '#18e018';
+    g += `<rect x="366" y="322" width="37" height="37" fill="#000"/><rect x="377" y="324" width="15" height="10" fill="none" stroke="${bc}" stroke-width="1.5"/><line x1="384" y1="334" x2="384" y2="346" stroke="${bc}"/><path d="M368,337 L368,355 L400,337 L400,355 Z" fill="${bc}" stroke="${bc}"/>`;
+    g += `<path d="M354,435 L414,435 L407,448 L361,448 Z" fill="${p.iv > 0.02 ? '#ff2020' : '#18e018'}"/><circle cx="384" cy="441" r="1.5" fill="#000"/>`;
+    const ps = (q) => q.fail ? 'fail' : q.run ? 'run' : 'stop';
+    g += pumpO(598, 334, ps(p.ssb[0]), 'right', 8) + pumpO(598, 388, ps(p.ssb[1]), 'right', 8) + pumpO(871, 592, ps(p.cw[0]), 'left', 8) + pumpO(871, 658, ps(p.cw[1]), 'left', 8);
+    return bgWrap('ovw', `NO.${n} UNIT WATER FLOW SYSTEM`, g);
+  }
+  window.HMIX_OVW = scrOvwOPS;
 
   /* ============================== AIR SUPPLY SYSTEM (layar 00010) ============================== */
   function scrAir() {
@@ -557,7 +537,7 @@
     [0, 5, 10, 20, 40].forEach((I, k) => { g += b3(772 + (k % 3) * 66, 80 + Math.floor(k / 3) * 30, 62, 24, `${I} mm/h`, rn.I === I ? 'yel' : '', `x:rain:${I}`); });
     g += T(772, 155, `Intensitas set: ${f(rn.I, 0)} mm/h`, 't') + T(772, 172, `Tambahan inflow: ${f(rn.q, 1)} m³/s`, 't') + T(772, 189, `Inflow intake: ${f(P.inflow, 1)} m³/s`, 't');
     g += T(772, 210, 'Curah hujan kumulatif (mm):', 't') + rn.acc.map((a, i) => T(772 + (i % 3) * 66, 227 + Math.floor(i / 3) * 16, `R${i + 1} ${f(a, 1)}`, 'ts cy')).join('');
-    g += mline(867, 275, 'Data sintetis: di OPS nilai = "?"\n(tidak terkomunikasi). Limpasan &\nrating curve WLS = asumsi.', 'ts tc dim', 11);
+    g += mline(867, 275, 'Nilai simulasi (di OPS tidak\nterkomunikasi). Limpasan &\nrating curve WLS = asumsi.', 'ts tc dim', 11);
     return g;
   }
 
@@ -580,7 +560,7 @@
     const Iline = (p, q) => Math.hypot(p, q) * 1000 / (Math.sqrt(3) * 154);
     const ph = (I, k) => v1(I * [1.0, 1.008, 1.04][k], 0);
     const unitI = (n) => { const u = U(n); return u.p.cb && sy.unitOnGrid(n) ? Iline(u.p.p, u.p.q) : 0; };
-    const lstI = ss.kw('252-LS') / (Math.sqrt(3) * 154 * 0.88), lstT = 38 + 0.02 * ss.kw('252-LS') / 10;
+    const lstI = ss.kw('252-LS') / (Math.sqrt(3) * 154 * 0.88);
     const ai = [['TRANSMISSION LINE NO.1 ACTIVE POWER', v1(fl.L1.p), 'MW'], ['TRANSMISSION LINE NO.1 REACTIVE POWER', v1(fl.L1.q), 'MVar'],
       ...[0, 1, 2].map((k) => [`TRANSMISSION LINE NO.1 CURRENT PHASE ${'RST'[k]}`, ph(Iline(fl.L1.p, fl.L1.q), k), 'A']),
       ['TRANSMISSION LINE NO.2 ACTIVE POWER', v1(fl.L2.p), 'MW'], ['TRANSMISSION LINE NO.2 REACTIVE POWER', v1(fl.L2.q), 'MVar'],
@@ -588,8 +568,8 @@
       ['150KV BUS-A VOLTAGE', lv.A ? v1(154.9) : '0.0', 'kV'], ['150KV BUS-A FREQUENCY', lv.A ? v1(sy.freq) : '0.0', 'Hz'], ['150KV BUS-B VOLTAGE', lv.B ? v1(154.6) : '0.0', 'kV'], ['150KV BUS-B FREQUENCY', lv.B ? v1(sy.freq) : '0.0', 'Hz'],
       ...[0, 1, 2].map((k) => [`150KV BUS-TIE CURRENT PHASE ${'RST'[k]}`, ph(fl.BT, k), 'A']),
       ...[1, 2, 3].flatMap((n) => [0, 1, 2].map((k) => [`150KV MTR. UNIT NO.${n} CURRENT PHASE ${'RST'[k]}`, v1(unitI(n) * [1, 0.98, 1.02][k]), 'A'])),
-      ...[0, 1, 2].map((k) => [`LSTR. CURRENT PHASE ${'RST'[k]}`, v1(lstI * [1, 1.05, 0.95][k]), 'A']), ['LSTR. TAP POSITION', String(sy.tap), ''], ['OUTDOOR SWITCHYARD AMBIENT TEMPERATURE', '32', '℃']];
-    const rtd = [['SPARE', '0', ''], ['LSTR. WINDING TEMPERATURE', v1(lstT + 1.5), '℃'], ['LSTR. OIL TEMPERATURE', v1(lstT + 2.3), '℃']];
+      ...[0, 1, 2].map((k) => [`LSTR. CURRENT PHASE ${'RST'[k]}`, v1(lstI * [1, 1.05, 0.95][k]), 'A']), ['LSTR. TAP POSITION', String(sy.tap), ''], ['OUTDOOR SWITCHYARD AMBIENT TEMPERATURE', v1(PC().amb('out')), '℃']];
+    const rtd = [['SPARE', '0', ''], ['LSTR. WINDING TEMPERATURE', v1(PC().amb('lstWdg')), '℃'], ['LSTR. OIL TEMPERATURE', v1(PC().amb('lstOil')), '℃']];
     return aiScreen('ANALOG INPUT FOR SWITCHYARD', 6, ai, rtd);
   }
   function aiUSS() {
@@ -603,7 +583,7 @@
       ['400V BUS-B ACTIVE POWER', v1(ss.nodeKW.P4B || 0), 'kW'], ['400V BUS-B VOLTAGE', V('P4B'), 'V'], ['400V BUS-B CURRENT', v1(ss.nodeAmps('P4B'), 0), 'A'], ['SPARE', '0', ''], ['SPARE', '0', ''],
       ['400V BUS-TIE 352B-A1 CURRENT', a('352B-A1'), 'A'], ['400V BUS-TIE 352B-A2 CURRENT', a('352B-A2'), 'A'], ['400V BUS-TIE 352B-B1 CURRENT', a('352B-B1'), 'A'], ['400V BUS-TIE 352B-B2 CURRENT', a('352B-B2'), 'A'],
       ['COMMON MCC CURRENT', a('352-4'), 'A'], ['TAILRACE WATER LEVEL', f(173.41, 2), 'Elm']];
-    const rtd = [['USTR.1 WINDING TEMPERATURE', v1(ss.ustT[1]), '℃'], ['USTR.2 WINDING TEMPERATURE', v1(ss.ustT[2]), '℃'], ['USTR.3 WINDING TEMPERATURE', v1(ss.ustT[3]), '℃'], ['UNDERGROUND POWERHOUSE AMBIENT TEMPERATURE', '?', '℃']];
+    const rtd = [['USTR.1 WINDING TEMPERATURE', v1(ss.ustT[1]), '℃'], ['USTR.2 WINDING TEMPERATURE', v1(ss.ustT[2]), '℃'], ['USTR.3 WINDING TEMPERATURE', v1(ss.ustT[3]), '℃'], ['UNDERGROUND POWERHOUSE AMBIENT TEMPERATURE', v1(PC().amb('uph')), '℃']];
     return aiScreen('ANALOG INPUT FOR UNDERGROUND STATION SERVICE', 4, ai, rtd);
   }
   function aiMSS() {
@@ -615,7 +595,7 @@
       ['400V BUS-B ACTIVE POWER', kw('352-S2'), 'kW'], ['400V BUS-B CURRENT', v1(ss.amps('352-S2'), 0), 'A'], ['400V BUS-TIE (352B-A3) CURRENT', a('352B-A3'), 'A'], ['400V BUS-TIE (352B-A4) CURRENT', a('352B-A4'), 'A'],
       ['400V BUS-TIE (352B-B3) CURRENT', a('352B-B3'), 'A'], ['400V BUS-TIE (352B-B4) CURRENT', a('352B-B4'), 'A'], ['20KV BUS-A VOLTAGE', V('M20A'), 'kV'], ['20KV BUS-B VOLTAGE', V('M20B'), 'kV'],
       ['400V BUS-A VOLTAGE', v1(ss.volt('M4A'), 1), 'V'], ['400V BUS-B VOLTAGE', v1(ss.volt('M4B'), 1), 'V'], ['DG ACTIVE POWER', v1(dg.kw), 'kW'], ['DG VOLTAGE', v1(dg.v), 'V'], ['DG CURRENT', a('52DG'), 'A'], ['DG FREQUENCY', v1(dg.run ? dg.f : 45.0), 'Hz']];
-    return aiScreen('ANALOG INPUT FOR MAIN CONTROL ROOM STATION SERVICE', 5, ai, [['MAIN CONTROL ROOM AMBIENT TEMPERATURE', '?', '℃']]);
+    return aiScreen('ANALOG INPUT FOR MAIN CONTROL ROOM STATION SERVICE', 5, ai, [['MAIN CONTROL ROOM AMBIENT TEMPERATURE', v1(PC().amb('mch')), '℃']]);
   }
 
   /* ============================== DAILY POWER OPERATION (layar 00096) ============================== */

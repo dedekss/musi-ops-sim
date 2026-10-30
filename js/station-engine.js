@@ -648,6 +648,20 @@
       return null;
     }
     tod() { return (this.clock0 + this.plant.t) % 86400; }
+    // suhu lingkungan/peralatan simulasi (nilai '?' di OPS): pola harian (puncak ±14:00) + pengaruh beban
+    amb(k) {
+      const h = this.tod() / 3600, d = Math.sin((h - 8) / 24 * 2 * Math.PI), pl = this.plant, U = (n) => pl.units[n - 1];
+      const lst = pl.ss ? pl.ss.kw('252-LS') : 500;
+      switch (k) {
+        case 'out': return 28.5 + 4.5 * d;
+        case 'mch': return 25.5 + 1.2 * d;
+        case 'uph': return 33.0 + 0.6 * d + 0.012 * this.totals().p;
+        case 'mtr1': case 'mtr2': case 'mtr3': { const u = U(+k.slice(3)); return 31.5 + 1.5 * d + 0.08 * Math.max(0, u.p.p); }
+        case 'lstOil': return 29.0 + 3.0 * d + lst / 60;
+        case 'lstWdg': return 29.5 + 3.0 * d + lst / 55;
+        default: return 30;
+      }
+    }
     nowMs() { return this.date0 + (this.clock0 + this.plant.t) * 1000; }
     setClock(h, m) { this.clock0 = ((h * 3600 + m * 60 - this.plant.t) % 86400 + 86400) % 86400; }
     idx(tod = this.tod()) { return Math.floor(tod / 900) % 96; }
