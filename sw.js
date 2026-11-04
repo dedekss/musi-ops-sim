@@ -1,6 +1,8 @@
 /* MUSI OPS Sim – service worker: semua file disimpan di perangkat supaya simulator berjalan offline.
-   Saat file di-update, naikkan VERSION agar perangkat mengunduh versi baru. */
-const VERSION = 'musi-ops-sim-v3.4';
+   Saat file di-update, naikkan VERSION.
+   Strategi (mulai v3.5): saat online file selalu diambil dari server (network-first) lalu salinannya diperbarui,
+   sehingga versi lama dan baru tidak tercampur; saat offline dipakai salinan di perangkat. */
+const VERSION = 'musi-ops-sim-v3.5';
 const FILES = [
   './',
   './index.html',
@@ -23,8 +25,15 @@ const FILES = [
   './icons/favicon-64.png',
 ];
 
+// install: unduh tiap file langsung dari server (lewati cache HTTP browser);
+// satu file yang gagal tidak membatalkan seluruh pembaruan
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(VERSION)
+      .then((c) => Promise.allSettled(FILES.map((f) =>
+        fetch(new Request(f, { cache: 'reload' })).then((res) => (res.ok ? c.put(f, res) : null)))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (e) => {
@@ -35,28 +44,19 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// cache-first (offline penuh); halaman utama dicoba dari jaringan dulu supaya update cepat terlihat
+// network-first untuk semua file aplikasi; salinan di perangkat hanya untuk offline
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (req.mode === 'navigate') {
-    e.respondWith(
-      fetch(req).then((res) => {
-        // hanya versi yang sukses (200) yang menggantikan salinan; 404/500 → tetap pakai salinan di perangkat
-        if (!res.ok) return caches.match('./index.html').then((hit) => hit || res);
-        const copy = res.clone();
-        caches.open(VERSION).then((c) => c.put('./index.html', copy));
-        return res;
-      }).catch(() => caches.match('./index.html'))
-    );
-    return;
-  }
+  const key = req.mode === 'navigate' ? './index.html' : req;
   e.respondWith(
-    caches.match(req, { ignoreSearch: true }).then((hit) => hit || fetch(req).then((res) => {
-      if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); }
+    fetch(req.mode === 'navigate' ? req.url : req, { cache: 'no-cache' }).then((res) => {
+      if (!res.ok) return caches.match(key, { ignoreSearch: true }).then((hit) => hit || res);
+      const copy = res.clone();
+      caches.open(VERSION).then((c) => c.put(key, copy));
       return res;
-    }))
+    }).catch(() => caches.match(key, { ignoreSearch: true }).then((hit) => hit || caches.match('./index.html')))
   );
 });

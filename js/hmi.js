@@ -4,7 +4,7 @@
   const M = window.MUSI;
   const P = new M.Plant();
   P.initOperating();
-  const APP_VER = 'v3.4';
+  const APP_VER = 'v3.5';
   const SPEEDS = [1, 2, 5, 10, 20, 60];
   let scr = 'main', hist = [], mult = 5, paused = false, curU = 1, selFault = 'cw_main_trip', fsUnit = 1, trendU = 1;
   const silenced = new Set();
@@ -36,6 +36,8 @@
   /* =========================== SCREEN REGISTRY =========================== */
   // layar & aksi tambahan didaftarkan oleh js/hmi-ss.js lewat window.HMIX
   const EXTS = {}, EXTU = {}, EXTA = {}, NA_MSG = {};
+  // cadangan: bila data panduan gagal dimuat, tombol PANDUAN tetap menampilkan keterangan (diganti oleh hmi-guide.js)
+  EXTS.guide = { no: '00092', title: () => 'PANDUAN PENGGUNAAN', grp: 'ins', html: true, draw: () => '<div class="h2">PANDUAN PENGGUNAAN</div><div class="note2" style="font-size:13px;color:#ddd">Data panduan belum termuat. Muat ulang halaman (laptop: Ctrl + Shift + R), atau pastikan file js/guide-data.js dan js/hmi-guide.js ada di folder aplikasi.</div>' };
   const SCR = {
     main: { no: '00001', title: () => 'Main Screen', grp: 'main' },
     sy: { no: '00002', title: () => '150kV SWITCHYARD', grp: 'ctl' },
@@ -124,8 +126,7 @@
     });
     g += sec(522, 52, 'Analog Input', [[['Unit No.1', 'nav:ai1'], ['Unit No.2', 'nav:ai2'], ['Unit No.3', 'nav:ai3']], [['Station Service (USS)', 'nav:aiuss'], ['Station Service (MSS)', 'nav:aimss'], ['Switchyard', 'nav:aisy'], ['Intake & Reregulating Dam', 'nav:aidam']]], '#ffa040');
     g += T(980, 638, `MUSI OPS Sim ${APP_VER}`, 'tr dim', 'style="font-size:10px"');
-    g += T(495, 600, 'Semua menu aktif. Nilai bertanda ASUMSI di layar = data belum tersedia di dokumen PLTA Musi.', 'tc dim', 'style="font-size:10px"');
-    g += T(495, 616, 'FAULT SIM. (kanan atas) = block diagram proteksi JEZ2K031: aktifkan sendiri input yang diinginkan.', 'tc dim', 'style="font-size:10px"');
+    g += T(495, 608, 'Hanya untuk simulasi dan pelatihan. Nilai parameter bersifat pendekatan (asumsi) dan tidak dapat dijadikan acuan operasi.', 'tc dim', 'style="font-size:10px"');
     return g;
   }
 
