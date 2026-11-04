@@ -2,7 +2,7 @@
    Saat file di-update, naikkan VERSION.
    Strategi (mulai v3.5): saat online file selalu diambil dari server (network-first) lalu salinannya diperbarui,
    sehingga versi lama dan baru tidak tercampur; saat offline dipakai salinan di perangkat. */
-const VERSION = 'musi-ops-sim-v3.5';
+const VERSION = 'musi-ops-sim-v3.6';
 const FILES = [
   './',
   './index.html',

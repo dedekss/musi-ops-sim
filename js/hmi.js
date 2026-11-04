@@ -4,7 +4,7 @@
   const M = window.MUSI;
   const P = new M.Plant();
   P.initOperating();
-  const APP_VER = 'v3.5';
+  const APP_VER = 'v3.6';
   const SPEEDS = [1, 2, 5, 10, 20, 60];
   let scr = 'main', hist = [], mult = 5, paused = false, curU = 1, selFault = 'cw_main_trip', fsUnit = 1, trendU = 1;
   const silenced = new Set();

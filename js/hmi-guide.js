@@ -1,6 +1,7 @@
 /* MUSI HEPP – PANDUAN PENGGUNAAN di dalam aplikasi (mulai v3.4).
    Isi dari window.GUIDE (js/guide-data.js), dibangkitkan dari dokumen "Panduan MUSI OPS Sim".
-   Tata letak: daftar isi di kiri, isi bab di kanan, kotak CARI di atas. Berjalan offline. */
+   Tata letak: daftar isi di kiri, isi bab di kanan, kotak CARI di atas. Berjalan offline.
+   Mulai v3.6 halaman ini boleh dibaca tegak (portrait) di HP: daftar isi menjadi menu pilihan bab. */
 (() => {
   'use strict';
   const X = window.HMIX, G = window.GUIDE; if (!X || !G) return;
@@ -35,6 +36,14 @@
       toc += `<div class="gd-ch${!st.q && st.sec === i ? ' on' : ''}" data-a="x:gds:${i}">${esc(s.t)}</div>`;
       if (!st.q && st.sec === i) s.sub.forEach((t, k) => { toc += `<div class="gd-sub" data-a="x:gds:${i}:${k}">${esc(t)}</div>`; });
     });
+    // menu pilihan bab untuk mode portrait (daftar isi kiri disembunyikan lewat CSS)
+    let sel = `<select id="gdSel" class="gd-sel" aria-label="Pilih bab">`;
+    if (st.q) sel += `<option value="" selected>Hasil pencarian “${esc(st.q)}”</option>`;
+    G.sec.forEach((s, i) => {
+      sel += `<option value="${i}"${!st.q && st.sec === i ? ' selected' : ''}>${esc(s.t)}</option>`;
+      s.sub.forEach((t, k) => { sel += `<option value="${i}:${k}">\u00a0\u00a0\u00a0${esc(t)}</option>`; });
+    });
+    sel += '</select>';
     let body;
     if (st.q) {
       const r = search(st.q);
@@ -48,7 +57,7 @@
     } else body = `<h2>${esc(G.sec[st.sec].t)}</h2>` + withIds(G.sec[st.sec].h, st.sec);
     return `<div class="gd">
       <div class="gd-top"><b>PANDUAN PENGGUNAAN</b><span class="gd-ver">${esc(G.title)}</span>
-        <span class="gd-srch"><input id="gdQ" type="search" autocomplete="off" spellcheck="false" placeholder="kata kunci, mis. 86-5" value="${esc(st.q)}">${B('x:gdq', 'CARI', true)}${st.q ? B('x:gdc', 'SEMUA BAB') : ''}</span></div>
+        ${sel}<span class="gd-srch"><input id="gdQ" type="search" autocomplete="off" spellcheck="false" placeholder="kata kunci, mis. 86-5" value="${esc(st.q)}">${B('x:gdq', 'CARI', true)}${st.q ? B('x:gdc', 'SEMUA BAB') : ''}</span></div>
       <div class="gd-main"><div class="gd-toc">${toc}<div class="gd-foot">Versi aplikasi ${esc(X.APP_VER)} · panduan ${esc(G.ver)}</div></div>
       <div class="gd-body" id="gdBody">${body}</div></div></div>`;
   }
@@ -68,4 +77,18 @@
     gdc: () => { st.q = ''; refresh(); },
   });
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target && ev.target.id === 'gdQ') { ev.preventDefault(); EXTA.gdq(); } });
+  document.addEventListener('change', (ev) => { if (ev.target && ev.target.id === 'gdSel' && ev.target.value !== '') EXTA.gds(ev.target.value.split(':')); });
+
+  // ---- orientasi: hanya halaman PANDUAN yang boleh portrait ----
+  let gp = null;
+  const setGP = (on) => {
+    if (on === gp) return; gp = on;
+    document.documentElement.classList.toggle('gp', on);                       // web/PWA: sembunyikan "putar perangkat"
+    try { if (window.MusiAndroid && window.MusiAndroid.setPortraitAllowed) window.MusiAndroid.setPortraitAllowed(on); } catch (e) { /* abaikan */ }
+    try {                                                                        // Android Chrome (PWA terpasang): lepas/kunci orientasi
+      const o = screen.orientation;
+      if (o) { if (on) { if (o.unlock) o.unlock(); } else if (o.lock) o.lock('landscape').catch(() => {}); }
+    } catch (e) { /* tidak didukung (iOS) */ }
+  };
+  setInterval(() => setGP(X.scr === 'guide'), 250);
 })();
