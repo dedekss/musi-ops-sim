@@ -320,7 +320,7 @@
     g += tank(55, 75, 90, 300, 574, 581, pl.intakeWL, [[579.1, '#ffa040', 'FSL'], [577.51, '#ff4040', '86-5']]);
     g += T(100, 395, `WL ${f(pl.intakeWL, 2)} El.m`, 't tc', 'style="fill:#4ce0ff;font-size:13px"');
     const qT = d.qTurb();
-    const rows = [['Volume (f7)', `${f(volI(pl.intakeWL), 0)} ×10³ m³`], ['Inflow alami (instruktur)', `${f(pl.inflow, 1)} m³/s`], ['Inflow terhitung (5 menit)', `${f(d.qnEst, 1)} m³/s`],
+    const rows = [['Volume (f7)', `${f(volI(pl.intakeWL), 0)} ×10³ m³`], ['Inflow alami (pengguna)', `${f(pl.inflow, 1)} m³/s`], ['Inflow terhitung (5 menit)', `${f(d.qnEst, 1)} m³/s`],
       ['Debit turbin total', `${f(qT, 1)} m³/s`], ...[1, 2, 3].map((n) => [`  Unit ${n}`, `${f(U(n).meas().flow, 1)} m³/s`]), ['Debit spillway total', `${f(pl.spillQ, 1)} m³/s`],
       ['Spillway gate control', d.sgLatch ? `AKTIF · set ${f(d.sgQset, 1)} m³/s` : 'siaga (WL ≤ FSL)'], ['Catu 20 kV feeder 252DL-ID', d.powered('ID') ? 'ADA' : 'HILANG']];
     rows.forEach(([a, b], i) => { g += T(215, 92 + i * 17, a, 't') + T(470, 92 + i * 17, b, 't tr cy'); });
@@ -329,12 +329,12 @@
     g += b3(330, 288, 60, 18, 'AUTO', !man ? 'yel' : '', 'x:dam:sgmode:AUTO') + b3(395, 288, 70, 18, 'MANUAL', man ? 'yel' : '', 'x:dam:sgmode:MANUAL');
     [0, 1, 2].forEach((i) => { g += gateBar(235 + i * 85, 330, d.sg[i], d.sgSet[i], d.qSpill(d.sg[i]), `GATE-${i + 1}`, `x:dam:sg:${i}`, man); });
     g += mline(250, 520, 'Q = 20.81·h^0.6·a^0.9 (gated) · Q = 19.00·h^1.5 (bebas)\nh = WL − 572.5 m · set tiap 300 s saat WL > FSL\nurutan buka: gate-2, gate-3, gate-1 · ambang 20 cm\ngaris kuning = bukaan set · laju gerak 0.3 m/menit (asumsi)', 't tc dim', 13);
-    g += b3(40, 590, 200, 26, 'SET INFLOW (instruktur)', '', 'x:dam:inflow') + b3(260, 590, 200, 26, 'WATER LEVEL CONTROL ▶', '', 'nav:wlc');
+    g += b3(40, 590, 200, 26, 'SET INFLOW (pengguna)', '', 'x:dam:inflow') + b3(260, 590, 200, 26, 'WATER LEVEL CONTROL ▶', '', 'nav:wlc');
     // re-reg dam
     g += R(500, 40, 480, 590, 'boxd') + T(740, 57, 'RE-REGULATING DAM (RTU-R)', 't tc cy');
     g += tank(545, 75, 90, 300, 148, 160, d.rwl, [[d.RFSL, '#ffa040', 'FSL'], [d.plannedRWL, '#40ff40', 'RENC.']]);
     g += T(590, 395, `RWL ${f(d.rwl, 2)} El.m`, 't tc', 'style="fill:#4ce0ff;font-size:13px"');
-    const r2 = [['Volume (f6)', `${f(volR(d.rwl), 0)} ×10³ m³`], ['Inflow = turbin + Qn', `${f(d.rIn, 1)} m³/s`], ['Qn aliran alami (instruktur)', `${f(d.rQn, 1)} m³/s`],
+    const r2 = [['Volume (f6)', `${f(volR(d.rwl), 0)} ×10³ m³`], ['Inflow = turbin + Qn', `${f(d.rIn, 1)} m³/s`], ['Qn aliran alami (pengguna)', `${f(d.rQn, 1)} m³/s`],
       ['Qr = (QTT·Top + QA·(24−Top))/24', `${f(d.qr, 1)} m³/s`], ['Qo = min(Qr + Qn, 41)', `${f(d.qo, 1)} m³/s`], ['Outflow total', `${f(d.rOut, 1)} m³/s`],
       ['Flood operation', d.flood ? 'AKTIF' : '—'], ['Catu 20 kV feeder 252DL-RD', d.powered('RD') ? 'ADA' : 'HILANG']];
     r2.forEach(([a, b], i) => { g += T(705, 92 + i * 17, a, 't', d.flood && i === 6 ? 'style="fill:#ff5050"' : '') + T(965, 92 + i * 17, b, 't tr cy'); });
@@ -532,8 +532,8 @@
     const v = (i) => f(rn.rgs[i], 1);
     g += box(435, 220, 'RGS-1', v(0), 'mm/h') + box(594, 250, 'RGS-2', v(1), 'mm/h') + box(337, 283, 'RGS-6', v(5), 'mm/h') + box(465, 345, 'RGS-4', v(3), 'mm/h');
     g += box(594, 378, 'RGS-3', v(2), 'mm/h') + box(495, 409, 'WLS-1', f(rn.wls(0), 2), 'Elm') + box(337, 442, 'RGS-5', v(4), 'mm/h') + box(402, 508, 'WLS-2', f(rn.wls(1), 2), 'Elm');
-    // panel instruktur
-    g += R(760, 50, 215, 250, 'boxd') + T(867, 68, 'INSTRUKTUR: HUJAN DAS', 't tc cy');
+    // panel pengguna
+    g += R(760, 50, 215, 250, 'boxd') + T(867, 68, 'PENGGUNA: HUJAN DAS', 't tc cy');
     [0, 5, 10, 20, 40].forEach((I, k) => { g += b3(772 + (k % 3) * 66, 80 + Math.floor(k / 3) * 30, 62, 24, `${I} mm/h`, rn.I === I ? 'yel' : '', `x:rain:${I}`); });
     g += T(772, 155, `Intensitas set: ${f(rn.I, 0)} mm/h`, 't') + T(772, 172, `Tambahan inflow: ${f(rn.q, 1)} m³/s`, 't') + T(772, 189, `Inflow intake: ${f(P.inflow, 1)} m³/s`, 't');
     g += T(772, 210, 'Curah hujan kumulatif (mm):', 't') + rn.acc.map((a, i) => T(772 + (i % 3) * 66, 227 + Math.floor(i / 3) * 16, `R${i + 1} ${f(a, 1)}`, 'ts cy')).join('');
@@ -798,7 +798,7 @@
     rain: { no: '00023', title: () => 'RAIN FALL MONITOR', grp: 'airg', draw: scrRain },
     dam: { no: '00022', title: () => 'INTAKE DAM & REREGULATING DAM', grp: 'dam', draw: scrDamOPS },
     wlc: { no: '00036', title: () => 'WATER LEVEL CONTROL', grp: 'dam', draw: scrWLC },
-    damx: { no: '00062', title: () => 'INTAKE & RE-DAM – DETAIL RTU (INSTRUKTUR)', grp: 'dam', draw: scrDamX },
+    damx: { no: '00062', title: () => 'INTAKE & RE-DAM – DETAIL RTU (PENGGUNA)', grp: 'dam', draw: scrDamX },
     rdc: { no: '00063', title: () => 'RE-REGULATING DAM CONTROL (JEZ2K042)', grp: 'dam', html: true, draw: scrRDC },
     aidam: { no: '00087', title: () => 'RTU ANALOG INPUT (DAM)', grp: 'aig', html: true, draw: aiDam },
     aiuss: { no: '00084', title: () => 'ANALOG INPUT FOR UNDERGROUND S/S', grp: 'aig', draw: aiUSS },

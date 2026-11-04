@@ -4,6 +4,7 @@
   const M = window.MUSI;
   const P = new M.Plant();
   P.initOperating();
+  const APP_VER = 'v3.4';
   const SPEEDS = [1, 2, 5, 10, 20, 60];
   let scr = 'main', hist = [], mult = 5, paused = false, curU = 1, selFault = 'cw_main_trip', fsUnit = 1, trendU = 1;
   const silenced = new Set();
@@ -41,7 +42,7 @@
     alm: { no: '00094', title: () => 'ALARM SUMMARY', grp: 'ins', html: true },
     trend: { no: '00097', title: () => 'TREND GRAPH', grp: 'ins', html: true },
     prot: { no: '00098', title: () => 'PROTECTION SCHEME (86 LOCKOUT)', grp: 'ins', html: true },
-    fault: { no: '00099', title: () => 'SKENARIO & INISIALISASI (INSTRUKTUR)', grp: 'ins', html: true },
+    fault: { no: '00099', title: () => 'SKENARIO & INISIALISASI (PENGGUNA)', grp: 'ins', html: true },
     annsy: { no: '00076', title: () => 'SWITCHYARD ANN', grp: 'ann' },
     annuss: { no: '00074', title: () => 'UNDERGROUND S/S ANN', grp: 'ann' },
     annmss: { no: '00075', title: () => 'MAIN CONTROL S/S ANN', grp: 'ann' },
@@ -74,7 +75,7 @@
     sys: (n) => [[`ovw${n}`, `NO.${n} WATER FLOW`], [`cap${n}`, 'CAPABILITY CURVE'], [`vib${n}`, 'VIBRATION'], [`ai${n}`, 'ANALOG INPUT'], ['trend', 'Historical']],
     ctl: () => [['sy', '150kV SY'], ['ctl1', 'NO.1 CONTROL PNL'], ['ctl2', 'NO.2 CONTROL PNL'], ['ctl3', 'NO.3 CONTROL PNL'], ['trend', 'Historical']],
     ann: () => [['ann1', 'UNIT1 ANN'], ['ann2', 'UNIT2 ANN'], ['ann3', 'UNIT3 ANN'], ['annuss', 'USS ANN'], ['annmss', 'MSS ANN'], ['annsy', 'SWITCHYARD ANN'], ['annmp1', 'MIMIC 1/2'], ['annmp2', 'MIMIC 2/2'], ['alm', 'AlmSum']],
-    ins: () => [['jza1', 'FAULT SIM. JEZ2K031'], ['force', 'FORCING I/O'], ['fault', 'SKENARIO/INIT'], ['prot', 'PROTECTION'], ['alm', 'ALARM SUM.'], ['trend', 'TREND']],
+    ins: () => [['jza1', 'FAULT SIM. JEZ2K031'], ['force', 'FORCING I/O'], ['fault', 'SKENARIO/INIT'], ['prot', 'PROTECTION'], ['alm', 'ALARM SUM.'], ['trend', 'TREND'], ['guide', 'PANDUAN']],
   };
   function go(id, push = true) {
     if (id === 'back') { id = hist.pop() || 'main'; push = false; }
@@ -99,7 +100,7 @@
     const pk = (y, s) => R(12, y, 140, 21, '', 'fill="#000" stroke="#bbb"') + T(82, y + 15, s, 'tc', 'style="fill:#e8e8e8;font-size:11px"');
     g += pk(3, 'PLN IP') + pk(26, 'UBP') + pk(49, 'BENGKULU');
     g += R(165, 15, 700, 45, '', 'fill="#000" stroke="#bbb" stroke-width="2"') + T(515, 46, 'Musi Hydro Electric Power Station Graphic Menu', 'tc', 'style="fill:#e8e8e8;font-size:22px;letter-spacing:.04em"');
-    [['jza1', 'FAULT SIM.'], ['force', 'FORCING I/O'], ['prot', 'PROTECTION'], ['trend', 'TREND']].forEach(([k, l], i) => { g += b3(877, 3 + i * 17, 104, 15, l, '', `nav:${k}`); });
+    [['jza1', 'FAULT SIM.'], ['force', 'FORCING I/O'], ['prot', 'PROTECTION'], ['trend', 'TREND'], ['guide', 'PANDUAN']].forEach(([k, l], i) => { g += b3(877, 2 + i * 14.2, 104, 13, l, '', `nav:${k}`); });
     const sec = (y, h, lab, rows, col, extra = '') => {
       let s = R(10, y, 255, h, '', 'fill="#000" stroke="#bbb"') + R(275, y, 705, h, '', 'fill="#000" stroke="#bbb"');
       s += extra || T(137, y + h / 2 + 6, lab, 'tc', 'style="fill:#e8e8e8;font-size:15px"');
@@ -122,6 +123,7 @@
         T(108, y + 66, `${f(m.rpm)} RPM`, 't cy') + T(190, y + 66, M.STEP[u.pos], 't', 'style="fill:#ffff40;font-size:9px"'));
     });
     g += sec(522, 52, 'Analog Input', [[['Unit No.1', 'nav:ai1'], ['Unit No.2', 'nav:ai2'], ['Unit No.3', 'nav:ai3']], [['Station Service (USS)', 'nav:aiuss'], ['Station Service (MSS)', 'nav:aimss'], ['Switchyard', 'nav:aisy'], ['Intake & Reregulating Dam', 'nav:aidam']]], '#ffa040');
+    g += T(980, 638, `MUSI OPS Sim ${APP_VER}`, 'tr dim', 'style="font-size:10px"');
     g += T(495, 600, 'Semua menu aktif. Nilai bertanda ASUMSI di layar = data belum tersedia di dokumen PLTA Musi.', 'tc dim', 'style="font-size:10px"');
     g += T(495, 616, 'FAULT SIM. (kanan atas) = block diagram proteksi JEZ2K031: aktifkan sendiri input yang diinginkan.', 'tc dim', 'style="font-size:10px"');
     return g;
@@ -539,10 +541,10 @@
     const u = U(fsUnit);
     const lo = ['86-1', '86-2', '86-4', '86-5', '86-T', '86-PC'].map((k) => `<div class="${u.lo[k] ? 'on' : ''}" data-a="rst:${fsUnit}:${k}" title="${esc(M.RESET_RULE[k])}"><i></i>${k}${u.lo[k] ? `<span style="font-size:10px;color:#ff9090"> RESET</span>` : ''}</div>`).join('');
     const loCause = Object.entries(u.lo).filter((e) => e[1]).map(([k, v]) => `<div class="ALARM">${k}: ${esc(v)}</div>`).join('') || '<div style="color:#30e030">Tidak ada lockout aktif</div>';
-    const ev = P.events.slice(-60).reverse().filter((e) => e.msg.startsWith(`U${fsUnit}:`) || e.msg.startsWith('SY:') || e.msg.startsWith('FAULT') || e.msg.startsWith('INSTRUKTUR') || e.msg.includes('KEHILANGAN')).slice(0, 30)
+    const ev = P.events.slice(-60).reverse().filter((e) => e.msg.startsWith(`U${fsUnit}:`) || e.msg.startsWith('SY:') || e.msg.startsWith('FAULT') || e.msg.startsWith('PENGGUNA') || e.msg.includes('KEHILANGAN')).slice(0, 30)
       .map((e) => `<div class="${e.type}">${fmtT(e.t)} ${esc(e.msg)}</div>`).join('');
     const act = sc.unit ? P.activeFault(sc.key, fsUnit) : P.activeFault(sc.key);
-    return `<div class="h2">SKENARIO & INISIALISASI (INSTRUKTUR)</div><div class="row" style="margin:4px 0"><span class="sb" data-a="nav:jza1" style="background:#ffd040;color:#000;padding:4px 8px;cursor:pointer">▶ FAULT SIM. – BLOCK DIAGRAM PROTEKSI JEZ2K031 (SH.001 / 002 / 003)</span></div><div class="fs">
+    return `<div class="h2">SKENARIO & INISIALISASI (PENGGUNA)</div><div class="row" style="margin:4px 0"><span class="sb" data-a="nav:jza1" style="background:#ffd040;color:#000;padding:4px 8px;cursor:pointer">▶ FAULT SIM. – BLOCK DIAGRAM PROTEKSI JEZ2K031 (SH.001 / 002 / 003)</span></div><div class="fs">
       <div class="col">
         <h4>INISIALISASI</h4><div class="row"><span class="sb" data-a="init:op">OPERASI (U1 / U2 / U3 = 70 MW)</span><span class="sb" data-a="init:stop">SEMUA STAND STILL</span><span class="sb" data-a="init:clr">HAPUS SEMUA GANGGUAN</span></div>
         <h4>UNIT TARGET</h4><div class="row">${unitList}</div>
@@ -764,8 +766,8 @@
   }
   function simDialog() {
     const sp = SPEEDS.map((s) => `<button data-a="spd:${s}" class="${mult === s ? 'on' : ''}">x${s}</button>`).join('');
-    dialog('SIMULATOR', `Waktu simulasi ${fmtT(P.t)}\nKecepatan x${mult} ${paused ? '(PAUSE)' : ''}`, null,
-      { extra: `<div class="simgrid">${sp}<button data-a="pause" class="${paused ? 'on' : ''}">${paused ? 'RESUME' : 'PAUSE'}</button></div><div class="simgrid"><button data-a="nav:jza1">FAULT SIM.</button><button data-a="init:op">INIT OPERASI</button><button data-a="init:stop">INIT STOP</button></div>` });
+    dialog('SIMULATOR', `MUSI OPS Sim ${APP_VER}\nWaktu simulasi ${fmtT(P.t)}\nKecepatan x${mult} ${paused ? '(PAUSE)' : ''}`, null,
+      { extra: `<div class="simgrid">${sp}<button data-a="pause" class="${paused ? 'on' : ''}">${paused ? 'RESUME' : 'PAUSE'}</button></div><div class="simgrid"><button data-a="nav:jza1">FAULT SIM.</button><button data-a="nav:guide">PANDUAN</button><button data-a="init:op">INIT OPERASI</button><button data-a="init:stop">INIT STOP</button></div>` });
   }
   // klik ditangani via pointerdown/up: tahan terhadap render ulang 250 ms (elemen diganti di tengah ketukan)
   let pd = null, holdRender = false;
@@ -838,7 +840,7 @@
     render();
   }
   setInterval(() => { const d = P.pc ? new Date(P.pc.nowMs()) : new Date(); $('sDate').textContent = d.toDateString() + ' ' + d.toTimeString().slice(0, 8); }, 1000);
-  window.HMIX = { scrAI, P, M, T, R, L, PL, lamp, mline, b3, vbox, navBox, title, backBtn, esc, f, U, dialog, closeDlg, go, render: () => render(), fmtT, arR, arU,
+  window.HMIX = { APP_VER, scrAI, P, M, T, R, L, PL, lamp, mline, b3, vbox, navBox, title, backBtn, esc, f, U, dialog, closeDlg, go, render: () => render(), fmtT, arR, arU,
     EXTS, EXTU, EXTA, TABS, NA_MSG, get scr() { return scr; }, hold: (v) => { holdRender = !!v; } };
   window.hmiBack = () => { if (!$('dlg').classList.contains('hidden')) { closeDlg(); return true; } if (vb && vb.w < VB0.w - 1) { fitW(); return true; } if (scr !== 'main') { go('back'); return true; } return false; };
   window.hmiPause = () => { };

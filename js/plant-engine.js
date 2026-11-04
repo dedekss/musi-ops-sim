@@ -51,7 +51,7 @@
   const volIntake = (x) => (189.475 * x * x - 218232.925 * x + 62839304.175) * 1000;
 
   /* ===================================================================== */
-  /*  DAFTAR SKENARIO GANGGUAN (instruktur)                                */
+  /*  DAFTAR SKENARIO GANGGUAN (pengguna)                                */
   /* ===================================================================== */
   // src: 'data' = tercantum di dokumen/annunciator; 'asumsi' = pemetaan tipikal yang perlu diverifikasi
   const SCENARIOS = [
@@ -190,7 +190,7 @@
   /*  JEZ2K031 – PROTECTION SCHEME FOR GENERATOR (SH.001 / SH.002 / SH.003) */
   /* ===================================================================== */
   // Setiap input = satu kotak pada gambar JEZ2K031. model(u, T) = nilai dari model plant (T = timer helper);
-  // instruktur dapat memaksa input ON/OFF (u.jf) atau mengubah nilai analog di belakangnya (u.ja).
+  // pengguna dapat memaksa input ON/OFF (u.jf) atau mengubah nilai analog di belakangnya (u.ja).
   // ana: variabel analog yang diukur sensor input tsb (lim = setelan; dir '>' / '<').
   const ANA = {
     thrust: { name: 'Suhu thrust bearing metal', unit: '℃', get: (u) => u.p.T.thrust, set: (u, v) => { u.p.T.thrust = v; }, rate: 2 },
@@ -916,9 +916,9 @@
     }
 
     /* ======================= PROTEKSI – LOGIKA JEZ2K031 ======================= */
-    // nilai input: paksa instruktur (jf: 'on' | 'off') atau model plant
+    // nilai input: paksa pengguna (jf: 'on' | 'off') atau model plant
     jzSig(id) { return !!(this.jin || {})[id]; }
-    jzApply(dt) {   // nilai analog yang diubah instruktur: bergerak dengan laju tertentu menuju target, menimpa model
+    jzApply(dt) {   // nilai analog yang diubah pengguna: bergerak dengan laju tertentu menuju target, menimpa model
       for (const [k, o] of Object.entries(this.ja)) {
         const a = ANA[k]; if (a.plant) continue;
         if (o.v === undefined) o.v = a.get(this);
@@ -934,7 +934,7 @@
         const f = this.jf[d.id];
         const v = f === 'on' ? true : f === 'off' ? false : !!d.model(this, T);
         jin[d.id] = v;
-        if (v && !prev[d.id] && this.jinInit) this.log('ALARM', `SOE ${d.soe} ${d.lab}${d.code ? ' (' + d.code + ')' : ''} ON${f ? ' – instruktur' : ''}`);
+        if (v && !prev[d.id] && this.jinInit) this.log('ALARM', `SOE ${d.soe} ${d.lab}${d.code ? ' (' + d.code + ')' : ''} ON${f ? ' – pengguna' : ''}`);
       }
       this.jin = jin; this.jinInit = true;
       const S = (id) => jin[id], OR = (...a) => a.some(Boolean), AND = (...a) => a.every(Boolean);
@@ -993,14 +993,14 @@
     jzForce(id, mode) {   // mode: 'on' | 'off' | null (kembali ke model)
       const d = JZ[id]; if (!d) return;
       if (mode) this.jf[id] = mode; else delete this.jf[id];
-      this.log('CMD', `INSTRUKTUR: input ${d.soe} ${d.lab} → ${mode ? 'PAKSA ' + mode.toUpperCase() : 'NORMAL (model)'}`);
+      this.log('CMD', `PENGGUNA: input ${d.soe} ${d.lab} → ${mode ? 'PAKSA ' + mode.toUpperCase() : 'NORMAL (model)'}`);
     }
     jzAnalog(key, tgt, rt) {   // tgt null = lepas (kembali ke model)
       const a = ANA[key];
-      if (tgt === null || tgt === undefined) { delete this.ja[key]; if (a.plant) delete this.plant.ja[key]; this.log('CMD', `INSTRUKTUR: ${a.name} kembali ke model`); return; }
+      if (tgt === null || tgt === undefined) { delete this.ja[key]; if (a.plant) delete this.plant.ja[key]; this.log('CMD', `PENGGUNA: ${a.name} kembali ke model`); return; }
       const o = { tgt: +tgt, rate: rt || a.rate, v: a.get(this) };
       if (a.plant) this.plant.ja[key] = o; else this.ja[key] = o;
-      this.log('CMD', `INSTRUKTUR: ${a.name} → ${tgt} ${a.unit} (laju ${o.rate} ${a.unit}/menit)`);
+      this.log('CMD', `PENGGUNA: ${a.name} → ${tgt} ${a.unit} (laju ${o.rate} ${a.unit}/menit)`);
     }
     jzClear() { this.jf = {}; for (const k of Object.keys(this.ja)) delete this.ja[k]; if (this.plant.ja) for (const k of Object.keys(this.plant.ja)) delete this.plant.ja[k]; }
     targetReset(dev) { for (const id of Object.keys(this.jtgt)) if (JZ[id].dev === dev && !this.jzSig(id)) delete this.jtgt[id]; this.log('CMD', `${dev} RESET PB (target relai)`); }
@@ -1183,7 +1183,7 @@
         if (u.fx[key]) { delete u.fx[key]; this.log('INFO', `FAULT CLEAR U${u.n}: ${s.name}`); return; }
         u.fx[key] = { t0: this.t, v: 0 };
         this.log('ALARM', `FAULT INJECT U${u.n}: ${s.name}`);
-        // gangguan yang efeknya baru muncul pada kondisi tertentu – beri tahu instruktur bila unit belum di kondisi itu
+        // gangguan yang efeknya baru muncul pada kondisi tertentu – beri tahu pengguna bila unit belum di kondisi itu
         const NEED = { lgb_water_low: ['rot', 'unit berputar (bearing baru memanas saat berputar)'], thrust_temp: ['rot', 'unit berputar'], tgb_vib: ['rot', 'unit berputar'],
           gov_runaway: ['gov', 'governor start (step RUNNING)'], gen_87: ['exc', 'generator bertegangan (step EXCITATION ke atas)'], gen_64e: ['exc', 'field breaker 41 tertutup'],
           exc_heavy: ['exc', 'eksitasi ON'], gen_40: ['cb', '52 tertutup (paralel jaringan)'], gen_46: ['cb', '52 tertutup (paralel jaringan)'],

@@ -1,4 +1,4 @@
-/* MUSI HEPP – FORCING I/O (instruktur): paksa nilai DI / DO / AI / AO berdasarkan tag.
+/* MUSI HEPP – FORCING I/O (pengguna): paksa nilai DI / DO / AI / AO berdasarkan tag.
    Alur: ketik tag → SEARCH (verifikasi tag ada) → ubah nilai (digital ON/OFF, analog 0–100 % rentang) → RELEASE. */
 (() => {
   'use strict';

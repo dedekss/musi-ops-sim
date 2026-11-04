@@ -1,6 +1,6 @@
 /* MUSI OPS Sim – service worker: semua file disimpan di perangkat supaya simulator berjalan offline.
    Saat file di-update, naikkan VERSION agar perangkat mengunduh versi baru. */
-const VERSION = 'musi-ops-sim-v3.2';
+const VERSION = 'musi-ops-sim-v3.4';
 const FILES = [
   './',
   './index.html',
@@ -13,6 +13,8 @@ const FILES = [
   './js/hmi-ss.js',
   './js/hmi-jz.js',
   './js/hmi-force.js',
+  './js/guide-data.js',
+  './js/hmi-guide.js',
   './js/pwa.js',
   './icons/icon-192.png',
   './icons/icon-512.png',

@@ -619,7 +619,7 @@
     { key: 'SCH-2', name: 'RAINY/WEEKEND', no: '00032', set: S2, inp: S2.slice(), src: 'layar OPS 00032' },
     { key: 'SCH-3', name: 'DRY/WEEKDAY', no: '00033', set: S4in.slice(), inp: S4in.slice(), src: 'ASUMSI – layar 00033 belum ada, disalin dari pola DRY/WEEKEND' },
     { key: 'SCH-4', name: 'DRY/WEEKEND', no: '00034', set: new Array(96).fill(0), inp: S4in, src: 'layar OPS 00034 (SET VALUE 0, INPUT VALUE belum di-SET)' },
-    { key: 'SCH-5', name: 'ARBITRARY SETUP', no: '00035', set: new Array(96).fill(70), inp: new Array(96).fill(70), src: 'ASUMSI – bebas diisi instruktur' },
+    { key: 'SCH-5', name: 'ARBITRARY SETUP', no: '00035', set: new Array(96).fill(70), inp: new Array(96).fill(70), src: 'ASUMSI – bebas diisi pengguna' },
   ];
   const ip = (pts, x) => { if (x <= pts[0][0]) return pts[0][1]; for (let i = 1; i < pts.length; i++) if (x <= pts[i][0]) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0); } return pts[pts.length - 1][1]; };
   // kurva WLC (bentuk mengikuti layar 00036; nilai = ASUMSI)

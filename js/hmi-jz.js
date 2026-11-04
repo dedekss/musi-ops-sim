@@ -1,5 +1,5 @@
 /* MUSI HEPP – PROTECTION SCHEME JEZ2K031 (SH.001 / SH.002 / SH.003) sebagai simulasi gangguan.
-   Block diagram mengikuti gambar Mitsubishi JEZ2K031; setiap kotak input dapat diaktifkan instruktur
+   Block diagram mengikuti gambar Mitsubishi JEZ2K031; setiap kotak input dapat diaktifkan pengguna
    (paksa ON/OFF) atau diubah nilai analognya. Logika dievaluasi oleh engine (Unit.protection). */
 (() => {
   'use strict';
@@ -57,7 +57,7 @@
     ['SH.001', 'SH.002', 'SH.003'].forEach((t, i) => { s += X.b3(sx + i * 51, sy, 48, 15, t, i === sh - 1 ? 'yel' : '', `nav:jz${'abc'[i]}${n}`); });
     y += dy;
     const act = Object.keys(u.jf).map((id) => `${JZ[id].soe} ${JZ[id].lab} (${u.jf[id] === 'on' ? 'ON' : 'OFF'})`).concat(Object.keys(u.ja).map((k) => `${ANA[k].name} → ${f(u.ja[k].tgt)} ${ANA[k].unit}`)).concat(Object.keys(P.ja || {}).map((k) => `${ANA[k].name} → ${f(P.ja[k].tgt, 2)} ${ANA[k].unit}`));
-    s += tx(x + 6, y + 34, `INPUT DIAKTIFKAN INSTRUKTUR (${act.length})`, 8, 'start', '#ffd000');
+    s += tx(x + 6, y + 34, `INPUT DIAKTIFKAN PENGGUNA (${act.length})`, 8, 'start', '#ffd000');
     act.slice(0, 6).forEach((t, i) => { s += tx(x + 6, y + (cp ? 70 : 47) + i * 11, '• ' + t.slice(0, cp ? 40 : 64), 7.5); });
     if (act.length > 6) s += tx(x + 6, y + 47 + 66, `… +${act.length - 6} lagi`, 7.5, 'start', '#aaa');
     s += X.b3(cp ? x + 6 : x + w - 112, cp ? y + 42 : y + 26, 106, 16, 'NORMALKAN SEMUA', act.length ? 'pink' : '', `x:jzclr:${n}`);
@@ -253,7 +253,7 @@
       if (d.ana) {
         const a = ANA[d.ana], av = a.get(u), man = u.ja[d.ana] || (a.plant && P.ja[d.ana]);
         const dec = a.unit === 'El.m' ? 2 : 1;
-        msg += `\n\nANALOG: ${a.name} = ${f(av, dec)} ${a.unit}\nSetelan: ${d.dir} ${d.lim} ${a.unit}${man ? `\nDiubah instruktur → ${f(man.tgt, dec)} ${a.unit} (${man.rate} ${a.unit}/menit)` : ''}`;
+        msg += `\n\nANALOG: ${a.name} = ${f(av, dec)} ${a.unit}\nSetelan: ${d.dir} ${d.lim} ${a.unit}${man ? `\nDiubah pengguna → ${f(man.tgt, dec)} ${a.unit} (${man.rate} ${a.unit}/menit)` : ''}`;
         const step = d.dir === '>' ? 1 : -1, big = a.unit === 'El.m' ? 0.3 : a.unit === '%' ? 5 : a.unit === 'µm' ? 30 : 3;
         const t1 = +(d.lim + step * big).toFixed(2), t0 = +(d.lim - step * big * 1.5).toFixed(2);
         extra += btns([[`x:jzan:${n}:${d.ana}:${t1}:${a.rate}`, `→ ${t1} (lewati setelan)`], [`x:jzan:${n}:${d.ana}:${t1}:${a.rate * 10}`, `→ ${t1} cepat`], [`x:jzan:${n}:${d.ana}:${t0}:${a.rate}`, `→ ${t0} (normal)`], [`x:jzan:${n}:${d.ana}:`, 'LEPAS ANALOG']]);
@@ -270,6 +270,6 @@
       dialog('RESET LOCK OUT RELAY', `UNIT ${n} – ${k}\nPenyebab: ${u.lo[k]}\n\nAturan reset: ${M.RESET_RULE[k]}\n\nEXECUTE ?`, () => u.reset86(k)); },
     jztr: ([n, dev]) => { U(+n).targetReset(dev); },
     jzpend: ([n]) => { X.closeDlg(); U(+n).pendulumReset(); },
-    jzclr: ([n]) => dialog('NORMALKAN SEMUA INPUT', `UNIT ${n}: semua input yang dipaksa dan nilai analog yang diubah dikembalikan ke model.\nLockout relay tetap; reset sesuai aturan.\n\nEXECUTE ?`, () => { U(+n).jzClear(); P.log('CMD', `INSTRUKTUR: U${n} semua input JEZ2K031 normal`); }),
+    jzclr: ([n]) => dialog('NORMALKAN SEMUA INPUT', `UNIT ${n}: semua input yang dipaksa dan nilai analog yang diubah dikembalikan ke model.\nLockout relay tetap; reset sesuai aturan.\n\nEXECUTE ?`, () => { U(+n).jzClear(); P.log('CMD', `PENGGUNA: U${n} semua input JEZ2K031 normal`); }),
   });
 })();
