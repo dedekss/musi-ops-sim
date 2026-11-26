@@ -315,6 +315,7 @@
       this.fx = {};                                      // gangguan aktif
       this.jf = {}; this.ja = {}; this.jtgt = {}; this.jin = {}; this.jg = {};   // JEZ2K031: input dipaksa, analog dimanipulasi, target relai
       this.do = {};                                      // perintah DO terakhir (indikasi)
+      this.doPend = {};                                  // v3.8: DO yang tertahan / tertunda oleh SEQ FAULT SIM
       this.p = this.coldState();
       this.alm = {};
     }
@@ -367,7 +368,39 @@
     }
     f(k) { return !!this.fx[k]; }
     log(type, msg) { this.plant.log(type, `U${this.n}: ${msg}`); }
-    setDO(tag, desc) { this.do[tag] = this.plant.t; this.log('CMD', `${this.n}${tag} ${desc}`); }
+    /* v3.8 – lapisan DO: perintah LCU (JEZ1L682 U566–U570) dapat "tidak keluar" atau "terlambat" (SEQ FAULT SIM).
+       act = aksi peralatan yang dijalankan bila DO benar-benar keluar. Return true bila keluar saat itu juga. */
+    setDO(tag, desc, act) {
+      if (this.doPend[tag]) return false;
+      const S = this.plant.seqf, f = S && S.flt[this.n + tag];
+      if (f && (f.mode === 'off' || f.mode === 'dly')) {
+        this.doPend[tag] = { desc, act, due: f.mode === 'dly' ? this.plant.t + f.sec : null };
+        this.log('ALARM', `${this.n}${tag} ${desc} – ${f.mode === 'off' ? 'DO TIDAK KELUAR' : `DO TERLAMBAT ${f.sec} s`} (gangguan I/O)`);
+        return false;
+      }
+      this.do[tag] = this.plant.t; this.log('CMD', `${this.n}${tag} ${desc}`);
+      if (act) act();
+      return true;
+    }
+    pollDO() {
+      for (const tag of Object.keys(this.doPend)) {
+        const pd = this.doPend[tag], S = this.plant.seqf, f = S && S.flt[this.n + tag];
+        if (f && f.mode === 'dly' && pd.due === null) pd.due = this.plant.t + f.sec;
+        const go = !f || (f.mode !== 'off' && f.mode !== 'dly') || (f.mode === 'dly' && this.plant.t >= pd.due);
+        if (!go) continue;
+        delete this.doPend[tag]; this.do[tag] = this.plant.t;
+        this.log('CMD', `${this.n}${tag} ${pd.desc}${f ? ' (tertunda)' : ' (keluar setelah I/O normal)'}`);
+        if (pd.act) pd.act();
+      }
+    }
+    /* v3.8 – lapisan AI: nilai analog yang dibaca LCU (AI0004 kV, AI0005 MW, AI0006 MVar) */
+    a(id, phys) { const S = this.plant.seqf; return S ? S.readA(this.n + id, phys) : phys; }
+    kV() { return this.p.vt * 11; }
+    chUse() { return this.d('DI0055', this.sw.s43CH === 'USE'); }
+    stepLim(tr) {   // timer SEQUENCE MONITOR; jalur CH: asumsi (gambar tidak mencantumkan)
+      if (tr.dir > 0 && this.chUse() && (tr.to === 3 || tr.to === 4)) return tr.to === 3 ? 120 : 300;
+      return tr.dir > 0 ? START_T[tr.to] : STOP_T[tr.to];
+    }
 
     /* ----------------------- status turunan ----------------------- */
     s13_1() { return this.p.speed > 0.5; }
@@ -486,20 +519,25 @@
         };
         case 2: return { a: [['GENERATOR MECHANICAL BRAKE RELEASE', d('DI0105', p.brake < 0.01), , 'DI0105'], ['INLET VALVE FULLY OPEN (21HA) ON', d('DI0169', p.iv > 0.995), , 'DI0169'], ['BYPASS VALVE FULLY CLOSE (33BPlb) ON', d('DI0170', p.bypass < 0.005), , 'DI0170'],
           ['TURBINE SPEED > 50% (13-1) ON', d('DI0139', this.s13_1()), , 'DI0139'], ['GEN.OIL COOLER OIL FLOW LOW', d('DI0106', p.genOil < 0.5), 'not', 'DI0106'], ['STOP DETECTOR (14L) OFF', !d('DI0143', this.s14L()), , 'DI0143']] };
-        case 3: return { a: [['TURBINE SPEED > 90% (13-2) ON', d('DI0142', this.s13_2()), , 'DI0142'], ['FILED CIRCUIT BREAKER (41) CLOSED', d('DI0078', p.fcb), , 'DI0078'], ['GENERATOR VOLTAGE > 90% (84EX)', d('DI0073', p.vt > 0.9), , 'DI0073']] };
-        case 4: return { a: [['UNIT CIRCUIT BREAKER (52) CLOSED', d('DI0090', p.cb), , 'DI0090']] };
-        case 5: return { a: [['GENERATOR POWER > 10%', p.p > 0.1 * PR]] };
+        case 3: if (this.chUse()) return { a: [['TURBINE SPEED > 90% (13-2) ON', d('DI0142', this.s13_2()), , 'DI0142'], ['FILED CIRCUIT BREAKER (41) CLOSED', d('DI0078', p.fcb), , 'DI0078'],
+            ['LINE CHARGE (EXCITATION COMPLETION + 30 s)', !!p.lc], ['43-90 MANUAL (FIELD CONSTANT)', d('DI0066', this.sw.AVR === 'MANUAL'), , 'DI0066'],
+            ['AVR EXCITATION LINE CHARGE MODE', d('DI0074', this.sw.s43CH === 'USE'), , 'DI0074'], ['GENERATOR VOLTAGE < 3.3 kV (5 s)', !!(this.tr && this.tr.v5 >= 5), , 'AI0004']] };
+          return { a: [['TURBINE SPEED > 90% (13-2) ON', d('DI0142', this.s13_2()), , 'DI0142'], ['FILED CIRCUIT BREAKER (41) CLOSED', d('DI0078', p.fcb), , 'DI0078'], ['GENERATOR VOLTAGE > 90% (84EX)', d('DI0073', p.vt > 0.9), , 'DI0073']] };
+        case 4: if (this.chUse()) return { a: [['UNIT CIRCUIT BREAKER (52) CLOSED', d('DI0090', p.cb), , 'DI0090'], ['GENERATOR VOLTAGE > 90% (84E2)', d('DI0073', p.vt > 0.9), , 'DI0073']] };
+          return { a: [['UNIT CIRCUIT BREAKER (52) CLOSED', d('DI0090', p.cb), , 'DI0090']] };
+        case 5: return { a: [['GENERATOR POWER > 3.5 MW (91P) 5 s', !!(this.tr && this.tr.to === 5 && this.tr.p5 >= 5), , 'AI0005']] };
       }
       return { a: [] };
     }
     condStop(k) {
       const p = this.p, d = (id, v) => this.d(id, v);
       switch (k) {   // JEZ1L675 SH.30 / 31 / 32 / 33–34 / 35
-        case 4: return { a: [['GUIDE VANE NO LOAD POSITION (74mb) ON', d('DI0206', this.s74mb()), , 'DI0206'], ['GENERATOR POWER < 5%', p.p < 0.05 * PR], ['GENERATOR REACTIVE POWER 5% > Q > -5%', Math.abs(p.q) < 0.05 * PR]] };
+        case 4: return { a: [['GUIDE VANE NO LOAD POSITION (74mb) ON', d('DI0206', this.s74mb()), 'or', 'DI0206'], ['GENERATOR POWER < 4 MW', this.a('AI0005', p.p) < 4, 'or', 'AI0005'],
+          ['GENERATOR REACTIVE POWER -3 MVar < Q < 3 MVar', Math.abs(this.a('AI0006', p.q)) < 3, , 'AI0006']] };
         case 3: return { a: [['UNIT CIRCUIT BREAKER (52) OPEN', d('DI0091', !p.cb), , 'DI0091']] };
-        case 2: return { a: [['FIELD CIRCUIT BREAKER (41) OPEN', d('DI0079', !p.fcb), , 'DI0079'], ['GENERATOR VOLTAGE < 60%', p.vt < 0.6]] };
+        case 2: return { a: [['FIELD CIRCUIT BREAKER (41) OPEN', d('DI0079', !p.fcb), , 'DI0079'], ['GENERATOR VOLTAGE < 60 % (84E1)', this.a('AI0004', this.kV()) < 6.6, , 'AI0004']] };
         case 1: return { a: [['GUIDE VANE FULLY CLOSE (33GVlb) ON', d('DI0205', p.gv < 0.3), , 'DI0205'], ['INLET VALVE FULLY CLOSE (33IVlb) ON', d('DI0168', p.iv < 0.005), , 'DI0168'], ['BYPASS VALVE FULLY CLOSE (33BPlb) ON', d('DI0170', p.bypass < 0.005), , 'DI0170'], ['OPERATING SEAL APPLIED', d('DI0174', p.seal > 0.995), , 'DI0174']] };
-        case 0: return { a: [['TIME DELAY RELAY FOR 14L (14LT) ON', this.s14LT()], ['SPACE HEATER (88SH) ON', d('DI0285', p.sh), , 'DI0285']] };
+        case 0: return { a: [['TIME DELAY RELAY FOR 14L (14LT) ON', this.s14LT()], ['1AX RESET', d('DI0058', !p.ax), , 'DI0058'], ['SPACE HEATER (88SH) ON', d('DI0285', p.sh), , 'DI0285']] };
       }
       return { a: [] };
     }
@@ -533,6 +571,7 @@
       }
       this.target = k;
       this.log('CMD', `43S-CS ${STEP[k]} OPERATE`);
+      if (k === 0 && this.sw.s43CH === 'USE') this.operate43CH(false, true);   // SH.06: 43S-CS STOP → 43CH LOCK
       this.retarget();
     }
     // posisi fisik unit dari status peralatan (dipakai bila transisi START terputus oleh stop/lockout)
@@ -553,6 +592,7 @@
       if (ph > this.pos) { this.log('INFO', `Transisi START → ${STEP[tr.to]} dihentikan; sekuens stop mulai dari step ${STEP[ph]}`); this.pos = ph; }
     }
     retarget() {
+      this.doPend = {};
       if (this.tr && this.tr.dir > 0 && this.target < this.tr.to) this.abortStart();
       const want = this.target > this.pos ? 1 : this.target < this.pos ? -1 : 0;
       if (this.tr && this.tr.dir === want && !this.tr.fail) return;     // sudah berjalan ke arah yang sama
@@ -572,9 +612,11 @@
     sequence(dt) {
       const p0 = this.p;
       // rem dilepas setelah stand still (block diagram SH.36: DO0112 = I/V step end AND 14LT)
+      this.pollDO();
       if (this.pos === 0 && !this.tr && p0.brakeCmd === 'apply' && this.s14LT() && p0.iv < 0.005) {
-        this.setDO('DO0112', 'BRAKE RELEASE (stand still)'); p0.brakeCmd = 'release';
+        this.setDO('DO0112', 'MECHANICAL BRAKE RELEASE COMMAND (stand still)', () => { p0.brakeCmd = 'release'; });
       }
+      if (p0.lc && (this.lo['86-1'] || this.lo['86-2'] || this.lo['86-5'] || this.sw.s43CH !== 'USE')) { p0.lc = false; p0.chLower = false; }   // SH.25 reset
       const tr = this.tr; if (!tr) return;
       const p = this.p, to = tr.to;
       this.coastDown(tr);
@@ -582,7 +624,9 @@
       if (!tr.started) {
         let pre = true;
         if (tr.dir > 0 && to === 1) pre = this.startingCond() && this.controlCond() && !this.anyLO();
-        if (tr.dir > 0 && to === 4) pre = !this.plant.units.some(u => u !== this && u.p.sync) && this.gridOK() && !this.lo['86-4'];
+        if (tr.dir > 0 && to === 4) pre = this.chUse() ? !this.lo['86-4'] && !!this.p.lc
+          : !this.plant.units.some(u => u !== this && u.d('DI0064', u.p.sync)) && this.gridOK() && !this.lo['86-4'];   // SH.24: ASS unit lain (nDI0064)
+        if (tr.dir > 0 && to === 5) pre = !this.chUse();     // Stop_To_CH: LOAD setelah 43CH LOCK
         if (tr.dir < 0 && to === 0) pre = this.s14LT();
         if (!pre) { tr.wait = true; return; }
         tr.started = true; tr.wait = false; tr.t = 0;
@@ -600,7 +644,7 @@
         if (this.pos !== this.target) this.beginTransition(); else { this.dir = 0; if (to === 5) this.log('OK', '*** START COMPLETE ***'); if (to === 0) this.log('OK', '*** STOP COMPLETE (STAND STILL) ***'); }
         return;
       }
-      const lim = tr.dir > 0 ? START_T[to] : STOP_T[to];
+      const lim = this.stepLim(tr);
       if (this.sw.USM && lim && tr.t > lim && !tr.fail) {
         tr.fail = true;
         this.p.mon.seqErr = STEP[to];
@@ -612,24 +656,25 @@
       return true;
     }
     onEnterTransition(tr) {
-      const p = this.p;
+      const p = this.p, sw = this.sw;
       if (tr.dir > 0) {
         switch (tr.to) {
-          case 1: this.setDO('DO0107', '1AX SET (aux. start: GOV pump, M.Tr pump, CW pump, booster, 88SH OFF)'); p.ax = true;
-            this.setDO('DO0109', 'HIGH PRESSURE OIL PUMP (88QT) START'); p.qtCmd = true; break;
+          case 1: this.setDO('DO0107', '1AX SET COMMAND (aux. start: GOV pump, M.Tr pump, CW pump, booster, 88SH OFF)', () => { p.ax = true; });
+            this.setDO('DO0109', 'HIGH PRESSURE OIL PUMP START COMMAND', () => { p.qtCmd = true; }); break;
           case 2: tr.sub = 0; break;
-          case 3: this.setDO('DO0157', 'EXCITATION START'); p.excOn = true; break;
-          case 4: this.setDO('DO0094', 'AUTO SYNCHRONIZER START (ASSX)'); p.sync = true; break;
-          case 5: this.setDO('DO0126', 'POC – POWER CONTROL'); this.sw.gov = 'POWER'; p.loadRaise = true; break;
+          case 3: this.setDO('DO0157', 'EXCITATION ON COMMAND', () => { p.excOn = true; }); break;
+          case 4: if (!this.chUse()) this.setDO('DO0094', 'AUTOMATIC SYNCHRONIZER START', () => { p.sync = true; }); break;
+          case 5: this.setDO('DO0126', 'POWER CONTROL ON (POC)', () => { sw.gov = 'POWER'; });
+            this.setDO('DO0101', '7-65 RAISE (LOAD RAISE)', () => { p.loadRaise = true; }); break;
         }
       } else {
         switch (tr.to) {
-          case 4: this.setDO('DO0102', 'NO LOAD CONTROL'); p.noLoad = true; p.loadRaise = false; this.setDO('DO0097/98', 'Q≈0 CONTROL'); p.qZero = true; break;
-          case 3: this.setDO('DO0106', '52 OPEN'); this.openCB('52 OPEN (sekuens stop)'); break;
-          case 2: this.setDO('DO0158', 'EXCITATION OFF'); p.excOn = false; p.sync = false; break;
-          case 1: this.setDO('DO0119', 'TURBINE STOP (65T)'); p.govOn = false; p.sync = false;
-            this.setDO('DO0130', 'INLET VALVE CLOSE'); break;
-          case 0: this.setDO('DO0108', '1AX RESET (aux. stop, 88SH ON)'); p.ax = false; p.qtCmd = false; break;
+          case 4: this.setDO('DO0102', '7-65 LOWER (NO LOAD CONTROL)', () => { p.noLoad = true; p.loadRaise = false; });
+            this.setDO(p.q > 0 ? 'DO0098' : 'DO0097', `7-90/70 ${p.q > 0 ? 'LOWER' : 'RAISE'} (Q = 0 CONTROL)`, () => { p.qZero = true; }); break;
+          case 3: this.setDO('DO0106', '52 OPEN COMMAND', () => this.openCB('52 OPEN (sekuens stop)')); break;
+          case 2: this.setDO('DO0158', 'EXCITATION OFF COMMAND', () => { p.excOn = false; p.sync = false; }); break;
+          case 1: this.setDO('DO0119', 'GOVERNOR STOP COMMAND (TURBINE STOP)', () => { p.govOn = false; p.sync = false; }); break;
+          case 0: break;   // DO0108 1AX RESET di transitionActions (SH.35: butuh 1AX ON DI0057)
         }
       }
     }
@@ -637,28 +682,90 @@
     coastDown(tr) {
       const p = this.p;
       if (!(tr.dir < 0 && tr.to <= 1 && (tr.started || tr.to === 0))) return;
-      if (!this.s13_2() && !p.qtCmd && p.speed > 0.01 && p.ax) { this.setDO('DO0109', '88QT START (coast down)'); p.qtCmd = true; }
-      if (p.gv < 0.3 && p.ivCmd !== 'close') { p.ivCmd = 'close'; }
-      if (this.s14_2() && p.brakeCmd !== 'apply' && p.speed > 0.002) { this.setDO('DO0111', 'BRAKE APPLY (n<20%) + DO0153 VACUUM CLEANER START'); p.brakeCmd = 'apply'; p.vq = true; p.vqT = 0; }
+      // Load_to_Stop: guide vane closed (DI0205) → DO0130 inlet valve close
+      if (this.d('DI0205', p.gv < 0.3) && p.ivCmd !== 'close') this.setDO('DO0130', 'INLET VALVE CLOSE COMMAND', () => { p.ivCmd = 'close'; });
+      if (!this.d('DI0139', this.s13_1()) && !p.qtCmd && p.speed > 0.01 && p.ax) this.setDO('DO0109', 'HIGH PRESSURE OIL PUMP START COMMAND (n < 50 %)', () => { p.qtCmd = true; });
+      if (this.d('DI0140', this.s14_2()) && p.brakeCmd !== 'apply' && p.speed > 0.002) {   // SH.36: n < 20 % (DI0140)
+        if (this.setDO('DO0111', 'MECHANICAL BRAKE APPLY COMMAND (n < 20 %)', () => { p.brakeCmd = 'apply'; })) this.setDO('DO0153', 'VACUUM CLEANER START', () => { p.vq = true; p.vqT = 0; });
+      }
     }
     transitionActions(tr, dt) {
-      const p = this.p;
-      if (tr.dir > 0 && tr.to === 2) {
+      const p = this.p, sw = this.sw;
+      if (tr.dir > 0 && tr.to === 2) {   // Stop_To_Load RUNNING / JEZ1L675 SH.21–22
         switch (tr.sub) {
-          case 0: if (p.brake < 0.99) { if (p.brakeCmd !== 'apply') { this.setDO('DO0111', 'BRAKE APPLY (for I/V open)'); p.brakeCmd = 'apply'; } }
-            else { this.setDO('DO0129', 'INLET VALVE OPEN'); p.ivCmd = 'open'; tr.sub = 1; } break;
-          case 1: if (this.d('DI0169', p.iv > 0.995) && this.d('DI0170', p.bypass < 0.005)) { this.setDO('DO0112', 'BRAKE RELEASE (for G/V open)'); p.brakeCmd = 'release'; tr.sub = 2; } break;
-          case 2: if (this.d('DI0105', p.brake < 0.01)) { this.setDO('DO0118', 'TURBINE GOVERNOR START (65S)'); this.setDO(this.gridOK() ? 'DO0121' : 'DO0120', this.gridOK() ? 'ISO OFF' : 'ISO ON');
-            p.govOn = true; this.sw.gov = 'SPEED'; p.sref = Math.max(p.speed, 0); p.xi = p.gv / 100; tr.sub = 3; } break;
-          case 3: if (this.d('DI0142', this.s13_2()) && !this.d('DI0106', p.genOil < 0.5)) { tr.hold = (tr.hold || 0) + dt; if (tr.hold > 5) { this.setDO('DO0110', 'HIGH PRESSURE OIL PUMP (88QT) STOP'); p.qtCmd = false; tr.sub = 4; } } break;
+          case 0: if (p.brake < 0.99) { if (p.brakeCmd !== 'apply') this.setDO('DO0111', 'MECHANICAL BRAKE APPLY COMMAND (for I/V open)', () => { p.brakeCmd = 'apply'; }); }
+            else if (p.ivCmd === 'open') tr.sub = 1;
+            else this.setDO('DO0129', 'INLET VALVE OPEN COMMAND', () => { p.ivCmd = 'open'; }); break;
+          case 1: if (this.d('DI0169', p.iv > 0.995) && this.d('DI0170', p.bypass < 0.005)) {
+            if (p.brakeCmd === 'release') tr.sub = 2; else this.setDO('DO0112', 'MECHANICAL BRAKE RELEASE COMMAND (for G/V open)', () => { p.brakeCmd = 'release'; }); } break;
+          case 2: if (this.d('DI0105', p.brake < 0.01)) {
+            if (p.govOn) tr.sub = 3;
+            else if (this.setDO('DO0118', 'GOVERNOR START COMMAND', () => { p.govOn = true; sw.gov = 'SPEED'; p.sref = Math.max(p.speed, 0); p.xi = p.gv / 100; })) {
+              const iso = !this.gridOK() || this.chUse();   // SH.22: ISO ON bila 152 OPEN atau 43CH USE
+              this.setDO(iso ? 'DO0120' : 'DO0121', iso ? 'ISO ON FOR REG (isolated network)' : 'ISO OFF FOR REG', () => { p.iso = iso; });
+            } } break;
+          case 3: if (this.d('DI0142', this.s13_2()) && !this.d('DI0106', p.genOil < 0.5)) { tr.hold = (tr.hold || 0) + dt;
+            if (tr.hold > 5) { if (!p.qtCmd) tr.sub = 4; else this.setDO('DO0110', 'HIGH PRESSURE OIL PUMP STOP COMMAND', () => { p.qtCmd = false; }); } } break;
         }
       }
-      if (tr.dir < 0 && tr.to === 0 && tr.started && p.brakeCmd === 'apply' && this.s14LT() && !tr.relDone) {
-        tr.relDone = true; // brake release setelah standstill (block diagram SH.36), vacuum cleaner stop +1 min
-        this.setDO('DO0112', 'BRAKE RELEASE (standstill)'); p.brakeCmd = 'release';
+      // ---- jalur LINE CHARGING (43CH USE) – JEZ1L675 SH.25, SH.26, Stop_To_CH ----
+      if (tr.dir > 0 && tr.to === 3 && this.chUse()) {
+        const exc = this.d('DI0142', this.s13_2()) && this.d('DI0078', p.fcb) && this.d('DI0073', p.vt > 0.9);
+        if (!p.lc) { tr.e30 = exc || tr.e30 ? (tr.e30 || 0) + dt : 0;
+          if (tr.e30 >= 30) { p.lc = true; this.log('STEP', 'LINE CHARGE CONTROL MODE ON (excitation step completion + 30 s)'); } }
+        if (p.lc) {
+          if (sw.AVR !== 'MANUAL') this.setDO('DO0100', '43-90 MANUAL (EXCITATION MANUAL MODE)', () => { sw.AVR = 'MANUAL'; });
+          else if (!p.chLower) this.setDO('DO0098', '7-90/70 LOWER (GENERATOR VOLTAGE LOWER)', () => { p.chLower = true; });
+        }
+        tr.v5 = this.a('AI0004', this.kV()) < 3.3 ? (tr.v5 || 0) + dt : 0;
+      }
+      if (tr.dir > 0 && tr.to === 4 && this.chUse() && !p.cb && !tr.closeDone) {
+        // SH.26 CLOSE CONDITION (CH): 43S-CS PARALLEL-IN, EXC COMPLETION(CH), 43CH USE, 1X, 52 OPEN (DI0091) → SH.50 DO0105
+        if (this.d('DI0091', !p.cb)) {
+          if (this.gridOK()) { if (!tr.liveWarn) { tr.liveWarn = true; this.log('ALARM', 'LINE CHARGE: bus 150 kV bertegangan – 52 tidak ditutup tanpa sinkron (mode CH hanya untuk bus/T-L mati)'); } }
+          else { tr.closeDone = true; this.setDO('DO0105', '52 CLOSE COMMAND (LINE CHARGE, tanpa synchronizer)', () => this.closeCB_CH()); }
+        }
+      }
+      if (tr.dir > 0 && tr.to === 5) tr.p5 = this.a('AI0005', p.p) > 3.5 ? (tr.p5 || 0) + dt : 0;    // SH.27 91P: > 3.5 MW 5 s
+      if (tr.dir < 0 && tr.to === 0 && tr.started) {
+        // SH.35: 1AX ON (DI0057) → DO0108 1AX RESET; Load_to_Stop: DO0110 HP oil pump stop
+        if (!tr.axDone && this.d('DI0057', p.ax)) tr.axDone = this.setDO('DO0108', '1AX RESET COMMAND (aux. stop, 88SH ON)', () => { p.ax = false; }) || !!this.doPend.DO0108;
+        if (p.qtCmd && !tr.qtDone) tr.qtDone = this.setDO('DO0110', 'HIGH PRESSURE OIL PUMP STOP COMMAND', () => { p.qtCmd = false; }) || !!this.doPend.DO0110;
+        if (p.brakeCmd === 'apply' && this.s14LT() && !tr.relDone) {   // SH.36: brake release setelah standstill, vacuum cleaner stop +1 min
+          tr.relDone = this.setDO('DO0112', 'MECHANICAL BRAKE RELEASE COMMAND (standstill)', () => { p.brakeCmd = 'release'; }) || !!this.doPend.DO0112;
+        }
       }
     }
-
+    closeCB_CH() {
+      const p = this.p;
+      if (p.cb) return;
+      p.cb = true; p.sync = false; p.islanded = true; p.p = 0; p.q = 0;
+      this.log('OK', `${this.n}DI0090 52 CLOSE – LINE CHARGING (bus/T-L mati, unit memberi tegangan)`);
+    }
+    // LINE CHARGE COMPLETION(2) – SH.26
+    lcc2() { return this.chUse() && this.p.cb && this.p.vt > 0.9 && this.pos >= 4; }
+    /* 43CH USE / LOCK – JEZ1L675 SH.06 (OPS 43CH, 43SC REMOTE) */
+    operate43CH(use, byStop) {
+      const sw = this.sw, p = this.p;
+      if (use) {
+        if (sw.s43CH === 'USE') return 'Sudah USE';
+        if (!this.s14LT()) { this.log('ALARM', '43CH USE ditolak: unit harus stand still (14LT ON) – JEZ1L675 SH.06'); return '43CH USE hanya saat unit STOP (14LT ON)'; }
+        this.log('CMD', '43CH USE (OPS)');
+        this.setDO('DO0095', '43CHX USE SELECT (line charge mode → ULCB/AVR)', () => { sw.s43CH = 'USE'; });
+        return null;
+      }
+      if (sw.s43CH === 'LOCK') return 'Sudah LOCK';
+      if (!byStop && !(this.s14LT() || this.lcc2())) { this.log('ALARM', '43CH LOCK ditolak: perlu 14LT ON atau LINE CHARGE COMPLETION(2) – SH.06'); return '43CH LOCK hanya saat STOP atau setelah LINE CHARGE COMPLETION(2)'; }
+      this.log('CMD', `43CH LOCK${byStop ? ' (43S-CS STOP)' : ' (OPS)'}`);
+      this.setDO('DO0096', '43CHX LOCK SELECT', () => {
+        sw.s43CH = 'LOCK'; p.lc = false; p.chLower = false;
+        if (p.cb) {
+          this.setDO('DO0121', 'ISO OFF FOR REG', () => { p.iso = false; });
+          this.setDO('DO0099', '43-90 AUTO (AVR AUTO)', () => { sw.AVR = 'AUTO'; });
+        }
+      });
+      return null;
+    }
     openCB(why) {
       const p = this.p;
       if (!p.cb) return;
@@ -691,7 +798,7 @@
         this.target = 0; this.retargetForce();
       }
     }
-    retargetForce() { this.tr = null; this.dir = this.target > this.pos ? 1 : this.target < this.pos ? -1 : 0; if (this.dir) { this.lastDir = this.dir; this.beginTransition(); } }
+    retargetForce() { this.doPend = {}; this.tr = null; this.dir = this.target > this.pos ? 1 : this.target < this.pos ? -1 : 0; if (this.dir) { this.lastDir = this.dir; this.beginTransition(); } }
     reset86(k) {   // JEZ2K031: R = RESET PB AND NOT(input SET); 86-5: R = 14L (DI0143) AND 86-5 RESET face plate
       if (!this.lo[k]) return;
       if (k === '86-5' && !this.jzSig('DI0143')) { this.log('INFO', '86-5 RESET ditolak: UNIT COMPLETELY STOP 14L (DI0143) belum ON'); return; }
@@ -719,6 +826,7 @@
     raise90(dir) {
       const p = this.p, sw = this.sw;
       if (p.cb && !p.islanded) { if (sw.AQR && sw.AVR === 'AUTO') sw.aqrSP = clamp(sw.aqrSP + dir, -40, 50); else p.qref = clamp(p.qref + dir, -40, 50); }
+      else if (sw.s43CH === 'USE') { p.vref = clamp(p.vref + dir * 0.05, 0.2, 1.1); p.chLower = false; }   // line charging: operator menaikkan tegangan
       else p.vref = clamp(p.vref + dir * 0.01, 0.9, 1.1);
     }
 
@@ -779,7 +887,7 @@
       this.pairStep(p.ssb, 'ssbMain', aux, dt, 1.5, 'SHAFT SEAL BOOSTER PUMP');
       this.pumpStep(p.qt, p.qtCmd, dt, 1.5);
       if (p.ax) { p.axT += dt; if (p.axT > 0.8) p.sh = false; } else { p.axT = 0; p.sh = p.speed < 0.05 ? true : p.sh; }
-      if (p.vq) { p.vqT += dt; if (p.brakeCmd === 'release' && p.vqT > 60) { p.vq = false; this.log('INFO', 'DO0154 VACUUM CLEANER STOP'); } }
+      if (p.vq) { p.vqT += dt; if (p.brakeCmd === 'release' && p.vqT > 60) this.setDO('DO0154', 'VACUUM CLEANER STOP (+1 min)', () => { p.vq = false; }); }
 
       const cw = (p.cw[0].run || p.cw[1].run) ? 1 : 0;
       p.f_lb = lag(p.f_lb, cw * (F.lgb_water_low ? 0.3 : 1), 3, dt);
@@ -817,6 +925,7 @@
       // ---------------- governor ----------------
       const isl = p.cb && !this.gridOK();
       if (isl && !p.islanded) { p.gvRate = 0.25; p.xi = Math.min(0.2, p.gv / 100); p.sref = 1; this.log('ALARM', 'KEHILANGAN JARINGAN – unit terisolasi (load rejection), governor → speed control'); }
+      if (!isl && p.islanded && p.cb) { p.xp = 0; p.pref = Math.max(p.p, 2); this.log('OK', 'Unit tersambung ke sistem (sinkron di sisi lawan) – governor power control'); }
       p.islanded = isl;
       let gvCmd = 0;
       const speedCtl = !p.cb || p.islanded;
@@ -870,6 +979,7 @@
           p.qref = rate(p.qref, qT, 1.0, dt);
           ft = 1 + p.qref / 42;
         } else ft = clamp(p.vref / sp, 0, 1.6);
+        if (p.chLower && !p.cb) p.vref = rate(p.vref, 0.25, 0.05, dt);      // Stop_To_CH: generator voltage lower < 30 %
         p.field = rate(p.field, ft, ft < p.field ? 0.6 : 0.12, dt);   // de-eksitasi cepat (negative ceiling thyristor), penguatan dibatasi
       } else p.field = rate(p.field, 0, 0.6, dt);
 
@@ -1167,7 +1277,7 @@
       EXT.forEach(e => e.build && e.build(this));
       this.alarms = new AlarmSystem(this);
     }
-    auxOK(n) { return this.ss ? this.ss.unitAux(n) : true; }
+    auxOK(n) { return this.chAux || (this.ss ? this.ss.unitAux(n) : true); }   // chAux: latihan line charging – catu bantu unit dianggap dari sumber darurat (asumsi)
     headFactor() { return clamp((this.intakeWL - 173.5) / (578.6 - 173.5), 0.9, 1.02); }
     log(type, msg) {
       this.events.push({ id: ++this.seq, t: this.t, type, msg });

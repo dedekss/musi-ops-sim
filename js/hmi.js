@@ -4,7 +4,7 @@
   const M = window.MUSI;
   const P = new M.Plant();
   P.initOperating();
-  const APP_VER = 'v3.7';
+  const APP_VER = 'v3.8';
   const SPEEDS = [1, 2, 5, 10, 20, 60];
   let scr = 'main', hist = [], mult = 5, paused = false, curU = 1, selFault = 'cw_main_trip', fsUnit = 1, trendU = 1;
   const silenced = new Set();
@@ -707,7 +707,7 @@
       case 'sw': {
         const n = +r[0], key = r[1]; let val = r[2]; if (val === 'true') val = true; if (val === 'false') val = false;
         const u = U(n); if (u.sw[key] === val) return;
-        if (key === 's43CH' && val === 'USE') { dialog('MESSAGE', 'Mode Line Charging (43CH USE) belum dimodelkan.\nHanya dapat dipilih sebelum start unit.', null); return; }
+        if (key === 's43CH') { dialog('SELECT', `UNIT NO.${n}\n43CH → ${val}${val === 'USE' ? '\n(line charging – hanya saat unit STOP / 14LT)' : ''}\n\nEXECUTE ?`, () => { const m = u.operate43CH(val === 'USE'); if (m) setTimeout(() => dialog('MESSAGE', m, null), 0); }); return; }
         const lab = typeof val === 'boolean' ? (val ? 'USE' : 'LOCK') : val;
         dialog('SELECT', `UNIT NO.${n}\n${SWL[key] || key} → ${lab}\n\nEXECUTE ?`, () => { u.sw[key] = val; P.log('CMD', `U${n}: ${SWL[key] || key} ${lab}`); });
         return;

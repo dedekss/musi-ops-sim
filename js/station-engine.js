@@ -565,7 +565,7 @@
     add('USS', 'B6', 'USSLCU', 'CHANGEOVER FUNCTION OPERATED (USSLCU)', 'L', (p) => p.ss && !!p.ss.seqP);
     add('USS', 'C6', '27-1U', '400V BUS-A UNDER VOLTAGE (27-1U)', 'H', (p) => rl(p, '27-1U'));
     add('USS', 'C6', '27-2U', '400V BUS-B UNDER VOLTAGE (27-2U)', 'H', (p) => rl(p, '27-2U'));
-    [1, 2, 3].forEach((n) => add('USS', 'C6', `MCC${n}`, `UNIT NO.${n} MCC POWER SUPPLY LOST`, 'H', (p) => p.ss && !p.ss.uaux[n]));
+    [1, 2, 3].forEach((n) => add('USS', 'C6', `MCC${n}`, `UNIT NO.${n} MCC POWER SUPPLY LOST`, 'H', (p) => p.ss && !p.ss.uaux[n] && !p.chAux));
     add('USS', 'C6', 'P4F', '400V BUS FAULT (50/51)', 'H', (p) => p.ss && (p.ss.fault.P4A || p.ss.fault.P4B));
     [1, 2, 3].forEach((n) => {
       add('USS', 'B7', `63AQH1-${n}`, `PRIMARY AIR TANK #${n} PRESSURE LOW (63AQH1)`, 'L', (p) => p.air && !p.air.sw(p.air.u[n - 1].prim).H1, 30);
