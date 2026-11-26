@@ -4,7 +4,7 @@
   const M = window.MUSI;
   const P = new M.Plant();
   P.initOperating();
-  const APP_VER = 'v3.6';
+  const APP_VER = 'v3.7';
   const SPEEDS = [1, 2, 5, 10, 20, 60];
   let scr = 'main', hist = [], mult = 5, paused = false, curU = 1, selFault = 'cw_main_trip', fsUnit = 1, trendU = 1;
   const silenced = new Set();
@@ -77,7 +77,7 @@
     sys: (n) => [[`ovw${n}`, `NO.${n} WATER FLOW`], [`cap${n}`, 'CAPABILITY CURVE'], [`vib${n}`, 'VIBRATION'], [`ai${n}`, 'ANALOG INPUT'], ['trend', 'Historical']],
     ctl: () => [['sy', '150kV SY'], ['ctl1', 'NO.1 CONTROL PNL'], ['ctl2', 'NO.2 CONTROL PNL'], ['ctl3', 'NO.3 CONTROL PNL'], ['trend', 'Historical']],
     ann: () => [['ann1', 'UNIT1 ANN'], ['ann2', 'UNIT2 ANN'], ['ann3', 'UNIT3 ANN'], ['annuss', 'USS ANN'], ['annmss', 'MSS ANN'], ['annsy', 'SWITCHYARD ANN'], ['annmp1', 'MIMIC 1/2'], ['annmp2', 'MIMIC 2/2'], ['alm', 'AlmSum']],
-    ins: () => [['jza1', 'FAULT SIM. JEZ2K031'], ['force', 'FORCING I/O'], ['fault', 'SKENARIO/INIT'], ['prot', 'PROTECTION'], ['alm', 'ALARM SUM.'], ['trend', 'TREND'], ['guide', 'PANDUAN']],
+    ins: () => [['jza1', 'FAULT SIM. JEZ2K031'], [`sqf${curU || 1}`, 'SEQ FAULT SIM'], ['force', 'FORCING I/O'], ['fault', 'SKENARIO/INIT'], ['prot', 'PROTECTION'], ['alm', 'ALARM SUM.'], ['trend', 'TREND'], ['guide', 'PANDUAN']],
   };
   function go(id, push = true) {
     if (id === 'back') { id = hist.pop() || 'main'; push = false; }
@@ -102,7 +102,7 @@
     const pk = (y, s) => R(12, y, 140, 21, '', 'fill="#000" stroke="#bbb"') + T(82, y + 15, s, 'tc', 'style="fill:#e8e8e8;font-size:11px"');
     g += pk(3, 'PLN IP') + pk(26, 'UBP') + pk(49, 'BENGKULU');
     g += R(165, 15, 700, 45, '', 'fill="#000" stroke="#bbb" stroke-width="2"') + T(515, 46, 'Musi Hydro Electric Power Station Graphic Menu', 'tc', 'style="fill:#e8e8e8;font-size:22px;letter-spacing:.04em"');
-    [['jza1', 'FAULT SIM.'], ['force', 'FORCING I/O'], ['prot', 'PROTECTION'], ['trend', 'TREND'], ['guide', 'PANDUAN']].forEach(([k, l], i) => { g += b3(877, 2 + i * 14.2, 104, 13, l, '', `nav:${k}`); });
+    [['jza1', 'FAULT SIM.'], ['sqf1', 'SEQ FAULT SIM'], ['force', 'FORCING I/O'], ['prot', 'PROTECTION'], ['trend', 'TREND'], ['guide', 'PANDUAN']].forEach(([k, l], i) => { g += b3(877, 2 + i * 11.8, 104, 10.8, l, '', `nav:${k}`); });
     const sec = (y, h, lab, rows, col, extra = '') => {
       let s = R(10, y, 255, h, '', 'fill="#000" stroke="#bbb"') + R(275, y, 705, h, '', 'fill="#000" stroke="#bbb"');
       s += extra || T(137, y + h / 2 + 6, lab, 'tc', 'style="fill:#e8e8e8;font-size:15px"');
@@ -768,7 +768,7 @@
   function simDialog() {
     const sp = SPEEDS.map((s) => `<button data-a="spd:${s}" class="${mult === s ? 'on' : ''}">x${s}</button>`).join('');
     dialog('SIMULATOR', `MUSI OPS Sim ${APP_VER}\nWaktu simulasi ${fmtT(P.t)}\nKecepatan x${mult} ${paused ? '(PAUSE)' : ''}`, null,
-      { extra: `<div class="simgrid">${sp}<button data-a="pause" class="${paused ? 'on' : ''}">${paused ? 'RESUME' : 'PAUSE'}</button></div><div class="simgrid"><button data-a="nav:jza1">FAULT SIM.</button><button data-a="nav:guide">PANDUAN</button><button data-a="init:op">INIT OPERASI</button><button data-a="init:stop">INIT STOP</button></div>` });
+      { extra: `<div class="simgrid">${sp}<button data-a="pause" class="${paused ? 'on' : ''}">${paused ? 'RESUME' : 'PAUSE'}</button></div><div class="simgrid"><button data-a="nav:jza1">FAULT SIM.</button><button data-a="nav:sqf1">SEQ FAULT SIM</button><button data-a="nav:guide">PANDUAN</button><button data-a="init:op">INIT OPERASI</button><button data-a="init:stop">INIT STOP</button></div>` });
   }
   // klik ditangani via pointerdown/up: tahan terhadap render ulang 250 ms (elemen diganti di tengah ketukan)
   let pd = null, holdRender = false;

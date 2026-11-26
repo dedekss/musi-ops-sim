@@ -357,6 +357,14 @@
     }
 
     get name() { return 'UNIT NO.' + this.n; }
+    /* v3.7 – lapisan DI LCU: sekuens membaca sinyal DI (tag sesuai block diagram JEZ1L675 / I/O list JEZ1L682),
+       bukan langsung status peralatan. Tanpa gangguan I/O nilai DI = status peralatan; SEQ FAULT SIM dapat
+       memaksa / membalik / menunda sinyal ini. id 'DI0091' → tag unit '1DI0091'; id berawalan angka (6DI…) dipakai apa adanya. */
+    d(id, phys) {
+      phys = !!phys;
+      const S = this.plant.seqf; if (!S) return phys;
+      return S.read(/^\d/.test(id) ? id : this.n + id, phys, this);
+    }
     f(k) { return !!this.fx[k]; }
     log(type, msg) { this.plant.log(type, `U${this.n}: ${msg}`); }
     setDO(tag, desc) { this.do[tag] = this.plant.t; this.log('CMD', `${this.n}${tag} ${desc}`); }
@@ -376,66 +384,70 @@
 
     /* ----------------- STARTING / CONTROL CONDITION --------------- */
     sc1() {
-      const p = this.p, sy = this.plant.sy, n = this.n, f = (k) => this.f(k);
+      const p = this.p, sy = this.plant.sy, n = this.n, f = (k) => this.f(k), d = (id, v) => this.d(id, v);
+      const yd = [null, ['6DI0161', '6DI0163', '6DI0165'], ['6DI0177', '6DI0179', '6DI0181'], ['6DI0209', '6DI0211', '6DI0213']][n];
+      // [label, nilai DI, tipe, tag]  – JEZ1L675 SH.10 STARTING CONDITION-1
       return [
-        ['UNIT CIRCUIT BREAKER (52) OPEN', !p.cb],
-        ['DISCONNECTING SWITCH (89) CLOSED', true],
-        [`LINE SIDE CIRCUIT BREAKER (152-U${n}) CLOSE`, sy.st['152-U' + n]],
-        ['150kV BUS A DISCONNECTING SWITCH (189A) CLOSE', sy.st[`189-U${n}A`], 'or'],
-        ['150kV BUS B DISCONNECTING SWITCH (189B) CLOSE', sy.st[`189-U${n}B`], 'or'],
-        [`U${n}LCB DC POWER SUPPLY FAILURE`, false, 'ornot'],
-        [`U${n}LCB AC POWER SUPPLY FAILURE`, false, 'ornot'],
-        ['DS FOR NEUTRAL GROUNDING (89NGT) CLOSE', true],
-        ['FIELD CIRCUIT BREAKER (41) OPEN', !p.fcb],
-        ['INLET VALVE FULLY CLOSED (33IVlb)', p.iv < 0.005],
-        ['BYPASS VALVE FOR I/V FULLY CLOSED (33BPlb)', p.bypass < 0.005],
-        ['I/V LOCKED', f('gv_locked'), 'not'],
-        ['I/V MAIN OIL SUPPLY VALVE OPEN', true],
-        ['MAINTENANCE SEAL RETRACTED', true],
-        ['I/V PRESSURE OIL SYSTEM PRESSURE HIGH', false, 'ornot'],
-        ['I/V PRESSURE OIL SYSTEM PRESSURE LOW 1ST', false, 'ornot'],
-        ['I/V PRESSURE OIL SYSTEM PRESSURE LOW 2ND', false, 'ornot'],
-        ['I/V PRESSURE TANK OIL LEVEL HIGH', false, 'ornot'],
-        ['I/V PRESSURE TANK OIL LEVEL LOW 1ST', false, 'ornot'],
-        ['I/V PRESSURE TANK OIL LEVEL LOW 2ND', false, 'ornot'],
-        ['I/V HP AIR COMPRESSOR PRESSURE LOW', false, 'not'],
-        ['UPPER GUIDE BEARING OIL LEVEL LOW', false, 'not'],
-        ['LOWER GUIDE BEARING OIL LEVEL LOW', f('brg_oil_low'), 'not'],
+        ['UNIT CIRCUIT BREAKER (52) OPEN', d('DI0091', !p.cb), , 'DI0091'],
+        ['DISCONNECTING SWITCH (89) CLOSED', d('DI0093', true), , 'DI0093'],
+        [`LINE SIDE CIRCUIT BREAKER (152-U${n}) CLOSE`, d(yd[0], sy.st['152-U' + n]), , yd[0]],
+        ['150kV BUS A DISCONNECTING SWITCH (189A) CLOSE', d(yd[1], sy.st[`189-U${n}A`]), 'or', yd[1]],
+        ['150kV BUS B DISCONNECTING SWITCH (189B) CLOSE', d(yd[2], sy.st[`189-U${n}B`]), 'or', yd[2]],
+        [`U${n}LCB DC POWER SUPPLY FAILURE`, d('DI0049', false), 'ornot', 'DI0049'],
+        [`U${n}LCB AC POWER SUPPLY FAILURE`, d('DI0050', false), 'ornot', 'DI0050'],
+        ['DS FOR NEUTRAL GROUNDING (89NGT) CLOSE', d('DI0095', true), , 'DI0095'],
+        ['FIELD CIRCUIT BREAKER (41) OPEN', d('DI0079', !p.fcb), , 'DI0079'],
+        ['INLET VALVE FULLY CLOSED (33IVlb)', d('DI0168', p.iv < 0.005), , 'DI0168'],
+        ['BYPASS VALVE FOR I/V FULLY CLOSED (33BPlb)', d('DI0170', p.bypass < 0.005), , 'DI0170'],
+        ['I/V LOCKED', d('DI0172', f('gv_locked')), 'not', 'DI0172'],
+        ['I/V MAIN OIL SUPPLY VALVE OPEN', d('DI0239', true), , 'DI0239'],
+        ['MAINTENANCE SEAL RETRACTED', d('DI0179', true), , 'DI0179'],
+        ['I/V PRESSURE OIL SYSTEM PRESSURE HIGH', d('DI0230', false), 'ornot', 'DI0230'],
+        ['I/V PRESSURE OIL SYSTEM PRESSURE LOW 1ST', d('DI0231', false), 'ornot', 'DI0231'],
+        ['I/V PRESSURE OIL SYSTEM PRESSURE LOW 2ND', d('DI0232', false), 'ornot', 'DI0232'],
+        ['I/V PRESSURE TANK OIL LEVEL HIGH', d('DI0220', false), 'ornot', 'DI0220'],
+        ['I/V PRESSURE TANK OIL LEVEL LOW 1ST', d('DI0221', false), 'ornot', 'DI0221'],
+        ['I/V PRESSURE TANK OIL LEVEL LOW 2ND', d('DI0222', false), 'ornot', 'DI0222'],
+        ['I/V HP AIR COMPRESSOR PRESSURE LOW', d('DI0243', false), 'not', 'DI0243'],
+        ['UPPER GUIDE BEARING OIL LEVEL LOW', d('DI0100', false), 'not', 'DI0100'],
+        ['LOWER GUIDE BEARING OIL LEVEL LOW', d('DI0101', f('brg_oil_low')), 'not', 'DI0101'],
       ];
     }
     sc2() {
-      const p = this.p, f = (k) => this.f(k);
+      const p = this.p, f = (k) => this.f(k), d = (id, v) => this.d(id, v);
+      // JEZ1L675 SH.11 STARTING CONDITION-2
       return [
-        ['GUIDE VANE FULLY COLSED (33GVlb)', p.gv < 0.3],
-        ['GUIDE VANE LOCKED', f('gv_locked'), 'not'],
-        ['GOVERNOR PRESSURE OIL SYSTEM PRESSURE HIGH', false, 'ornot'],
-        ['GOVERNOR PRESSURE OIL SYSTEM PRESSURE LOW 1ST', p.govP < 0.85, 'ornot'],
-        ['GOVERNOR PRESSURE OIL SYSTEM PRESSURE LOW 2ND', p.govP < 0.75, 'ornot'],
-        ['GOVERNOR PRESSURE TANK OIL LEVEL HIGH', false, 'ornot'],
-        ['GOVERNOR PRESSURE TANK OIL LEVEL LOW 1ST', p.govLvl < 0.85, 'ornot'],
-        ['GOVERNOR PRESSURE TANK OIL LEVEL LOW 2ND', p.govLvl < 0.75, 'ornot'],
-        ['GOVERNOR PRIMARY AIR TANK PRESSURE LOW', false, 'not'],
-        ['GOVERNOR MAIN OIL SUPPLY VALVE OPEN', true],
-        ['SHAFT SEAL MAINTENANCE SEAL APPLIED', false, 'not'],
-        ['GOVERNOR HP AIR SYSTEM READY', true],
-        ['OVERSPEED PENDULUM RESET', !this.p.mon.pendulum],
-        ['GENERATOR BRAKE RELEASE', p.brake < 0.01],
+        ['GUIDE VANE FULLY COLSED (33GVlb)', d('DI0205', p.gv < 0.3), , 'DI0205'],
+        ['GUIDE VANE LOCKED', d('DI0167', f('gv_locked')), 'not', 'DI0167'],
+        ['GOVERNOR PRESSURE OIL SYSTEM PRESSURE HIGH', d('DI0158', false), 'ornot', 'DI0158'],
+        ['GOVERNOR PRESSURE OIL SYSTEM PRESSURE LOW 1ST', d('DI0159', p.govP < 0.85), 'ornot', 'DI0159'],
+        ['GOVERNOR PRESSURE OIL SYSTEM PRESSURE LOW 2ND', d('DI0155', p.govP < 0.75), 'ornot', 'DI0155'],
+        ['GOVERNOR PRESSURE TANK OIL LEVEL HIGH', d('DI0202', false), 'ornot', 'DI0202'],
+        ['GOVERNOR PRESSURE TANK OIL LEVEL LOW 1ST', d('DI0203', p.govLvl < 0.85), 'ornot', 'DI0203'],
+        ['GOVERNOR PRESSURE TANK OIL LEVEL LOW 2ND', d('DI0204', p.govLvl < 0.75), 'ornot', 'DI0204'],
+        ['GOVERNOR PRIMARY AIR TANK PRESSURE LOW', d('DI0207', false), 'not', 'DI0207'],
+        ['GOVERNOR MAIN OIL SUPPLY VALVE OPEN', d('DI0150', true), , 'DI0150'],
+        ['SHAFT SEAL MAINTENANCE SEAL APPLIED', d('DI0215', false), 'not', 'DI0215'],
+        ['GOVERNOR HP AIR SYSTEM READY', d('DI0245', true), , 'DI0245'],
+        ['OVERSPEED PENDULUM RESET', d('DI0218', !this.p.mon.pendulum), , 'DI0218'],
+        ['GENERATOR BRAKE RELEASE', d('DI0105', p.brake < 0.01), , 'DI0105'],
         ['GENERATOR STOP', this.s14LT()],
-        ['GOVERNOR CONTROLLER FAULT', f('gov_fault'), 'not'],
-        ['GOVERNOR CONTROLLER READY FOR START', !this.anyLO()],
-        ['REGULATOR CONTROL MODE REMOTE', this.ctrl.govRemote],
+        ['GOVERNOR CONTROLLER FAULT', d('DI0129', f('gov_fault')), 'not', 'DI0129'],
+        ['GOVERNOR CONTROLLER READY FOR START', d('DI0132', !this.anyLO()), , 'DI0132'],
+        ['REGULATOR CONTROL MODE REMOTE', d('DI0138', this.ctrl.govRemote), , 'DI0138'],
       ];
     }
     sc3() {
-      const p = this.p;
+      const p = this.p, d = (id, v) => this.d(id, v);
+      // JEZ1L675 SH.12 STARTING CONDITION-3 + SH.14 (86-x) ; 86-5 = latch software LCU (SH.13), tidak lewat DI
       return [
-        ['FIELD CIRCUIT BREAKER (41) CLOSE', p.fcb, 'not'],
-        ['TURBINE BEARING OIL LEVEL LOW 1ST', this.tgbOilLvl() < 0.8, 'not'],
-        ['TURBINE BEARING OIL LEVEL LOW 2ND', this.tgbOilLvl() < 0.6, 'not'],
-        ['GENERATOR BRAKE AIR TANK PRESSURE LOW', false, 'not'],
-        ['86-1 OPERATE', this.lockout('86-1'), 'not'],
-        ['86-2 OPERATE', this.lockout('86-2'), 'not'],
-        ['86-4 OPERATE', this.lockout('86-4'), 'not'],
+        ['FIELD CIRCUIT BREAKER (41) CLOSE', d('DI0078', p.fcb), 'not', 'DI0078'],
+        ['TURBINE BEARING OIL LEVEL LOW 1ST', d('DI0213', this.tgbOilLvl() < 0.8), 'not', 'DI0213'],
+        ['TURBINE BEARING OIL LEVEL LOW 2ND', d('DI0212', this.tgbOilLvl() < 0.6), 'not', 'DI0212'],
+        ['GENERATOR BRAKE AIR TANK PRESSURE LOW', d('DI0208', false), 'not', 'DI0208'],
+        ['86-1 OPERATE', d('DI0113', this.lockout('86-1')), 'not', 'DI0113'],
+        ['86-2 OPERATE', d('DI0114', this.lockout('86-2')), 'not', 'DI0114'],
+        ['86-4 OPERATE', d('DI0115', this.lockout('86-4')), 'not', 'DI0115'],
         ['86-5 OPERATE', this.lockout('86-5'), 'not'],
       ];
     }
@@ -453,40 +465,41 @@
     startingCond() { return this.scOK(1) && this.scOK(2) && this.scOK(3); }
     ctrlList() {
       const c = this.ctrl;
-      return [['UNIT CIRCUIT BREAKER CONTROL SELECTOR REMOTE', c.cb52Remote], ['EXCITATION CONTROL SELECTOR REMOTE', c.excRemote && !this.f('ctrl_local')],
-        ['VOLTAGE CONTROL SELECTOR AUTO', c.voltAuto], ['GOVERNOR CONTROL SELECTOR REMOTE', c.govRemote]];
+      const d = (id, v) => this.d(id, v);   // JEZ1L675 SH.15 CONTROL CONDITION
+      return [['UNIT CIRCUIT BREAKER CONTROL SELECTOR REMOTE', d('DI0086', c.cb52Remote), , 'DI0086'], ['EXCITATION CONTROL SELECTOR REMOTE', d('DI0083', c.excRemote && !this.f('ctrl_local')), , 'DI0083'],
+        ['VOLTAGE CONTROL SELECTOR AUTO', d('DI0065', c.voltAuto), , 'DI0065'], ['GOVERNOR CONTROL SELECTOR REMOTE', d('DI0164', c.govRemote), , 'DI0164']];
     }
     controlCond() { return this.ctrlList().every(x => x[1]); }
 
     /* ------------- KONDISI MASUK STEP (sesuai layar seq. monitor) ------------- */
     condStart(k) {
-      const p = this.p;
-      const qpA = p.qp[0].run, qpB = p.qp[1].run, mA = p.mtr[0].run, mB = p.mtr[1].run;
-      switch (k) {
+      const p = this.p, d = (id, v) => this.d(id, v);
+      const qpA = d('DI0273', p.qp[0].run), qpB = d('DI0292', p.qp[1].run), mA = d('DI0250', p.mtr[0].run), mB = d('DI0251', p.mtr[1].run);
+      switch (k) {   // JEZ1L675 SH.20 / 21–22 / 23 / 24 / 27
         case 1: return {
           a: [['STARTING CONDITION', this.startingCond(), 'dash'], ['CONTROL CONDITION', this.controlCond(), 'dash']],
-          b: [['SPACE HEATER (88SH) OFF', !p.sh], ['GOVERNOR PRESSURE OIL PUMP - A START', qpA, 'or'], ['GOVERNOR PRESSURE OIL PUMP - B START', qpB, 'or'],
-            ['M.TR OIL PUMP - A START', mA, 'or2'], ['M.TR OIL PUMP - B START', mB, 'or2'], ['OIL LIFT PUMP (88QT) START', p.qt.run || this.s13_2()],
-            ['OIL LIFT PUMP PRESSURE RELAY (69QT) ON', p.lift > 0.8 || this.s13_2()]],
-          c: [['LOWER BRG.WATER FLOW LOW', p.f_lb < 0.6, 'not'], ['AIR COOLER WATER FLOW LOW', p.f_ac < 0.6, 'not'], ['GEN.OIL COOLER WATER FLOW LOW', p.f_goc < 0.6, 'not'],
-            ['TURBINE BEARING WATER FLOW AVAILABLE', p.f_tb > 0.7], ['SHAFT SEAL COOLING WATER FLOW AVAILBALE', p.f_sc > 0.7], ['SHAFT SEAL WATER PRESSURE AVAILABLE', p.sealP > 0.7]],
+          b: [['SPACE HEATER (88SH) OFF', d('DI0286', !p.sh), , 'DI0286'], ['GOVERNOR PRESSURE OIL PUMP - A START', qpA, 'or', 'DI0273'], ['GOVERNOR PRESSURE OIL PUMP - B START', qpB, 'or', 'DI0292'],
+            ['M.TR OIL PUMP - A START', mA, 'or2', 'DI0250'], ['M.TR OIL PUMP - B START', mB, 'or2', 'DI0251'], ['OIL LIFT PUMP (88QT) START', d('DI0279', p.qt.run || this.s13_2()), , 'DI0279'],
+            ['OIL LIFT PUMP PRESSURE RELAY (69QT) ON', d('DI0110', p.lift > 0.8 || this.s13_2()), , 'DI0110']],
+          c: [['LOWER BRG.WATER FLOW LOW', d('DI0107', p.f_lb < 0.6), 'not', 'DI0107'], ['AIR COOLER WATER FLOW LOW', d('DI0108', p.f_ac < 0.6), 'not', 'DI0108'], ['GEN.OIL COOLER WATER FLOW LOW', d('DI0109', p.f_goc < 0.6), 'not', 'DI0109'],
+            ['TURBINE BEARING WATER FLOW AVAILABLE', d('DI0235', p.f_tb > 0.7), , 'DI0235'], ['SHAFT SEAL COOLING WATER FLOW AVAILBALE', d('DI0242', p.f_sc > 0.7), , 'DI0242'], ['SHAFT SEAL WATER PRESSURE AVAILABLE', d('DI0216', p.sealP > 0.7), , 'DI0216']],
         };
-        case 2: return { a: [['GENERATOR MECHANICAL BRAKE RELEASE', p.brake < 0.01], ['INLET VALVE FULLY OPEN (21HA) ON', p.iv > 0.995], ['BYPASS VALVE FULLY CLOSE (33BPlb) ON', p.iv > 0.995 && p.bypass < 0.005],
-          ['TURBINE SPEED > 50% (13-1) ON', this.s13_1()], ['GEN.OIL COOLER OIL FLOW LOW', p.genOil < 0.5, 'not'], ['STOP DETECTOR (14L) OFF', !this.s14L()]] };
-        case 3: return { a: [['TURBINE SPEED > 90% (13-2) ON', this.s13_2()], ['FILED CIRCUIT BREAKER (41) CLOSED', p.fcb], ['GENERATOR VOLTAGE > 90% (84EX)', p.vt > 0.9]] };
-        case 4: return { a: [['UNIT CIRCUIT BREAKER (52) CLOSED', p.cb]] };
+        case 2: return { a: [['GENERATOR MECHANICAL BRAKE RELEASE', d('DI0105', p.brake < 0.01), , 'DI0105'], ['INLET VALVE FULLY OPEN (21HA) ON', d('DI0169', p.iv > 0.995), , 'DI0169'], ['BYPASS VALVE FULLY CLOSE (33BPlb) ON', d('DI0170', p.bypass < 0.005), , 'DI0170'],
+          ['TURBINE SPEED > 50% (13-1) ON', d('DI0139', this.s13_1()), , 'DI0139'], ['GEN.OIL COOLER OIL FLOW LOW', d('DI0106', p.genOil < 0.5), 'not', 'DI0106'], ['STOP DETECTOR (14L) OFF', !d('DI0143', this.s14L()), , 'DI0143']] };
+        case 3: return { a: [['TURBINE SPEED > 90% (13-2) ON', d('DI0142', this.s13_2()), , 'DI0142'], ['FILED CIRCUIT BREAKER (41) CLOSED', d('DI0078', p.fcb), , 'DI0078'], ['GENERATOR VOLTAGE > 90% (84EX)', d('DI0073', p.vt > 0.9), , 'DI0073']] };
+        case 4: return { a: [['UNIT CIRCUIT BREAKER (52) CLOSED', d('DI0090', p.cb), , 'DI0090']] };
         case 5: return { a: [['GENERATOR POWER > 10%', p.p > 0.1 * PR]] };
       }
       return { a: [] };
     }
     condStop(k) {
-      const p = this.p;
-      switch (k) {
-        case 4: return { a: [['GUIDE VANE NO LOAD POSITION (74mb) ON', this.s74mb()], ['GENERATOR POWER < 5%', p.p < 0.05 * PR], ['GENERATOR REACTIVE POWER 5% > Q > -5%', Math.abs(p.q) < 0.05 * PR]] };
-        case 3: return { a: [['UNIT CIRCUIT BREAKER (52) OPEN', !p.cb]] };
-        case 2: return { a: [['FIELD CIRCUIT BREAKER (41) OPEN', !p.fcb], ['GENERATOR VOLTAGE < 60%', p.vt < 0.6]] };
-        case 1: return { a: [['GUIDE VANE FULLY CLOSE (33GVlb) ON', p.gv < 0.3], ['INLET VALVE FULLY CLOSE (33IVlb) ON', p.iv < 0.005], ['BYPASS VALVE FULLY CLOSE (33BPlb) ON', p.bypass < 0.005], ['OPERATING SEAL APPLIED', p.seal > 0.995]] };
-        case 0: return { a: [['TIME DELAY RELAY FOR 14L (14LT) ON', this.s14LT()], ['SPACE HEATER (88SH) ON', p.sh]] };
+      const p = this.p, d = (id, v) => this.d(id, v);
+      switch (k) {   // JEZ1L675 SH.30 / 31 / 32 / 33–34 / 35
+        case 4: return { a: [['GUIDE VANE NO LOAD POSITION (74mb) ON', d('DI0206', this.s74mb()), , 'DI0206'], ['GENERATOR POWER < 5%', p.p < 0.05 * PR], ['GENERATOR REACTIVE POWER 5% > Q > -5%', Math.abs(p.q) < 0.05 * PR]] };
+        case 3: return { a: [['UNIT CIRCUIT BREAKER (52) OPEN', d('DI0091', !p.cb), , 'DI0091']] };
+        case 2: return { a: [['FIELD CIRCUIT BREAKER (41) OPEN', d('DI0079', !p.fcb), , 'DI0079'], ['GENERATOR VOLTAGE < 60%', p.vt < 0.6]] };
+        case 1: return { a: [['GUIDE VANE FULLY CLOSE (33GVlb) ON', d('DI0205', p.gv < 0.3), , 'DI0205'], ['INLET VALVE FULLY CLOSE (33IVlb) ON', d('DI0168', p.iv < 0.005), , 'DI0168'], ['BYPASS VALVE FULLY CLOSE (33BPlb) ON', d('DI0170', p.bypass < 0.005), , 'DI0170'], ['OPERATING SEAL APPLIED', d('DI0174', p.seal > 0.995), , 'DI0174']] };
+        case 0: return { a: [['TIME DELAY RELAY FOR 14L (14LT) ON', this.s14LT()], ['SPACE HEATER (88SH) ON', d('DI0285', p.sh), , 'DI0285']] };
       }
       return { a: [] };
     }
@@ -634,10 +647,10 @@
         switch (tr.sub) {
           case 0: if (p.brake < 0.99) { if (p.brakeCmd !== 'apply') { this.setDO('DO0111', 'BRAKE APPLY (for I/V open)'); p.brakeCmd = 'apply'; } }
             else { this.setDO('DO0129', 'INLET VALVE OPEN'); p.ivCmd = 'open'; tr.sub = 1; } break;
-          case 1: if (p.iv > 0.995 && p.bypass < 0.005) { this.setDO('DO0112', 'BRAKE RELEASE (for G/V open)'); p.brakeCmd = 'release'; tr.sub = 2; } break;
-          case 2: if (p.brake < 0.01) { this.setDO('DO0118', 'TURBINE GOVERNOR START (65S)'); this.setDO(this.gridOK() ? 'DO0121' : 'DO0120', this.gridOK() ? 'ISO OFF' : 'ISO ON');
+          case 1: if (this.d('DI0169', p.iv > 0.995) && this.d('DI0170', p.bypass < 0.005)) { this.setDO('DO0112', 'BRAKE RELEASE (for G/V open)'); p.brakeCmd = 'release'; tr.sub = 2; } break;
+          case 2: if (this.d('DI0105', p.brake < 0.01)) { this.setDO('DO0118', 'TURBINE GOVERNOR START (65S)'); this.setDO(this.gridOK() ? 'DO0121' : 'DO0120', this.gridOK() ? 'ISO OFF' : 'ISO ON');
             p.govOn = true; this.sw.gov = 'SPEED'; p.sref = Math.max(p.speed, 0); p.xi = p.gv / 100; tr.sub = 3; } break;
-          case 3: if (this.s13_2() && p.genOil >= 0.5) { tr.hold = (tr.hold || 0) + dt; if (tr.hold > 5) { this.setDO('DO0110', 'HIGH PRESSURE OIL PUMP (88QT) STOP'); p.qtCmd = false; tr.sub = 4; } } break;
+          case 3: if (this.d('DI0142', this.s13_2()) && !this.d('DI0106', p.genOil < 0.5)) { tr.hold = (tr.hold || 0) + dt; if (tr.hold > 5) { this.setDO('DO0110', 'HIGH PRESSURE OIL PUMP (88QT) STOP'); p.qtCmd = false; tr.sub = 4; } } break;
         }
       }
       if (tr.dir < 0 && tr.to === 0 && tr.started && p.brakeCmd === 'apply' && this.s14LT() && !tr.relDone) {

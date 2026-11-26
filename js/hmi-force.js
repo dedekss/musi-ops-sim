@@ -94,6 +94,8 @@
       const e = c[tag] || (c[tag] = { tag, type: 'DI', desc: d.lab + (d.code ? ` (${d.code})` : ''), jz: [], alarm: [] });
       e.jz.push([n, d.id]); e.desc = d.lab + (d.code ? ` (${d.code})` : '');
     }));
+    // DI permissive sekuens (v3.7, JEZ1L675/JEZ1L682): forcing ikut masuk logika sekuens
+    if (M.SEQF) [1, 2, 3].forEach((n) => M.SEQF.catalog(n).forEach((s) => { const e = c[s.tag] || (c[s.tag] = { tag: s.tag, type: 'DI', desc: s.name, jz: [], alarm: [] }); e.seq = true; if (!e.desc) e.desc = s.name; }));
     [1, 2, 3].forEach((n) => DO_DEF.forEach(([t, desc, on, off]) => { const tag = `${n}${t}`; c[tag] = { tag, type: 'DO', desc: `UNIT ${n} ${desc}`, n, on, off, base: t }; }));
     AO_DEF.forEach(([tag, desc, unit, lo, hi, get, set]) => { c[tag] = { tag, type: 'AO', desc, unit, lo, hi, get, set }; });
     CAT = c; return c;
@@ -101,7 +103,7 @@
   function find(tag) { const c = catalog(); if (c[tag]) return c[tag]; const a = collectAI(); return a[tag] || null; }
   function value(e) {
     if (!e) return null;
-    if (e.type === 'DI') { if (e.jz.length) return e.jz.some(([n, id]) => U(n).jzSig(id)); return e.alarm.some((i) => P.alarms.pt[i].on); }
+    if (e.type === 'DI') { if (e.seq && P.seqf && P.seqf.lcu[e.tag] !== undefined && (P.seqf.flt[e.tag] || !e.jz.length && !e.alarm.length)) return P.seqf.lcu[e.tag]; if (e.jz.length) return e.jz.some(([n, id]) => U(n).jzSig(id)); return e.alarm.some((i) => P.alarms.pt[i].on); }
     if (e.type === 'DO') { const u = U(e.n), p = u.p, b = e.base, D = u.do[b]; return FR.do[e.tag] !== undefined ? FR.do[e.tag] : D !== undefined && P.t - D < 2; }
     if (e.type === 'AO') return e.get();
     const a = collectAI()[e.tag]; return a ? (FR.ai[e.tag] !== undefined ? FR.ai[e.tag] : a.val) : null;
@@ -112,6 +114,7 @@
   function setDI(e, v) {
     e.jz.forEach(([n, id]) => U(n).jzForce(id, v === null ? null : v ? 'on' : 'off'));
     for (const i of e.alarm) { const tag = P.alarms.defs[i].tag; if (v === null) delete P.alarms.force[tag]; else P.alarms.force[tag] = !!v; }
+    if (e.seq && P.seqf) P.seqf.set(e.tag, v === null ? null : v ? 'on' : 'off');
     if (v === null) delete FR.di[e.tag]; else FR.di[e.tag] = !!v;
   }
   function setAI(e, eng) {
@@ -181,13 +184,13 @@
     h += fl.length ? `<table class="tbl"><tr><th>Tag</th><th>Tipe</th><th>Deskripsi</th><th>Paksa</th><th>Aktual</th><th></th></tr>${fl.map(([t, ty, v]) => { const e2 = find(t) || { unit: '' };
       return `<tr><td><a data-a="x:frcp:${esc(t)}" style="color:#ffd000;cursor:pointer">${esc(t)}</a></td><td>${ty}</td><td style="font-size:10px">${esc((e2.desc || '').slice(0, 42))}</td><td class="n">${esc(fmtV(e2, v))}</td><td class="n"><span class="fv" data-t="${esc(t)}">—</span></td><td>${B(`x:frcr:${t}`, 'RELEASE')}</td></tr>`; }).join('')}</table>
       <div>${B('x:frcra', 'RELEASE ALL', '#ff9090')}</div>` : '<div class="note2">Belum ada tag yang dipaksa.</div>';
-    h += `<div class="note2" style="margin-top:10px">Forcing berlaku sampai RELEASE (atau INIT). DI dipaksa → masuk logika proteksi JEZ2K031 & annunciator. DO dipaksa → perintah LCU ditahan (menimpa sekuens).
+    h += `<div class="note2" style="margin-top:10px">Forcing berlaku sampai RELEASE (atau INIT). DI dipaksa → masuk logika proteksi JEZ2K031, annunciator, dan permissive sekuens LCU (v3.7; lihat juga SEQ FAULT SIM). DO dipaksa → perintah LCU ditahan (menimpa sekuens).
       AI dipaksa → nilai di layar Analog Input; untuk suhu bantalan/M.Tr, getaran, tegangan generator, level intake/re-dam nilai fisik model ikut berubah. AO dipaksa → set point ditahan.
       Rentang 0–100 % analog: skala simulator (asumsi, bukan range transmitter asli). Penomoran AO = penomoran simulator.</div></div></div>`;
     return h;
   }
   function effect(e) {
-    if (e.type === 'DI') return [e.jz.length ? `input proteksi JEZ2K031 (${e.jz.map(([n, id]) => 'U' + n + ' SH.00' + JZ[id].sh).join(', ')})` : '', e.alarm.length ? 'annunciator / alarm' : ''].filter(Boolean).join(' + ');
+    if (e.type === 'DI') return [e.seq ? 'permissive sekuens LCU (JEZ1L675) – lihat SEQ FAULT SIM' : '', e.jz.length ? `input proteksi JEZ2K031 (${e.jz.map(([n, id]) => 'U' + n + ' SH.00' + JZ[id].sh).join(', ')})` : '', e.alarm.length ? 'annunciator / alarm' : ''].filter(Boolean).join(' + ');
     if (e.type === 'DO') return 'perintah LCU ke peralatan (ON = perintah aktif ditahan, OFF = kebalikannya/tidak aktif)';
     if (e.type === 'AO') return 'set point keluaran kontrol ditahan pada nilai paksa';
     return e.ana ? 'nilai tampilan + variabel fisik model (memicu proteksi/alarm)' : 'nilai tampilan layar Analog Input saja';

@@ -2,7 +2,7 @@
    Saat file di-update, naikkan VERSION.
    Strategi (mulai v3.5): saat online file selalu diambil dari server (network-first) lalu salinannya diperbarui,
    sehingga versi lama dan baru tidak tercampur; saat offline dipakai salinan di perangkat. */
-const VERSION = 'musi-ops-sim-v3.6';
+const VERSION = 'musi-ops-sim-v3.7';
 const FILES = [
   './',
   './index.html',
@@ -10,11 +10,13 @@ const FILES = [
   './css/hmi.css',
   './js/plant-engine.js',
   './js/station-engine.js',
+  './js/seq-fault.js',
   './js/hmi.js',
   './js/ops-static.js',
   './js/hmi-ss.js',
   './js/hmi-jz.js',
   './js/hmi-force.js',
+  './js/hmi-seqf.js',
   './js/guide-data.js',
   './js/hmi-guide.js',
   './js/pwa.js',
